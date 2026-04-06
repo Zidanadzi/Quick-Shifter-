@@ -31,15 +31,25 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
+      - name: Fix Corrupt Gradle Wrapper
+        run: |
+          echo "Checking Gradle wrapper integrity..."
+          # Try to run the jar. If it fails, it's corrupt.
+          if ! java -jar android/gradle/wrapper/gradle-wrapper.jar --version > /dev/null 2>&1; then
+            echo "Gradle wrapper is corrupt or invalid. Downloading a fresh one from official Gradle source..."
+            # We use the wrapper jar from the official Gradle GitHub repository
+            curl -L https://github.com/gradle/gradle/raw/v8.14.3/gradle/wrapper/gradle-wrapper.jar -o android/gradle/wrapper/gradle-wrapper.jar
+            echo "Fresh Gradle wrapper downloaded."
+          else
+            echo "Gradle wrapper is valid."
+          fi
+
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
-
-      - name: Fix Corrupt Gradle Wrapper (if needed)
-        run: |
-          if ! java -jar android/gradle/wrapper/gradle-wrapper.jar --version > /dev/null 2>&1; then
-            echo "Gradle wrapper is corrupt. Downloading a fresh one..."
-            curl -L https://raw.githubusercontent.com/gradle/gradle/v8.14.3/gradle/wrapper/gradle-wrapper.jar -o android/gradle/wrapper/gradle-wrapper.jar
-          fi
+        with:
+          # We already fixed/verified it, but we can disable validation if it's still picky
+          # however, a fresh download should pass.
+          cache-disabled: false
 
       - name: Sync Capacitor
         run: npx cap sync android
