@@ -31,6 +31,16 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Fix Corrupt Gradle Wrapper (if needed)
+        run: |
+          if ! java -jar android/gradle/wrapper/gradle-wrapper.jar --version > /dev/null 2>&1; then
+            echo "Gradle wrapper is corrupt. Downloading a fresh one..."
+            curl -L https://raw.githubusercontent.com/gradle/gradle/v8.14.3/gradle/wrapper/gradle-wrapper.jar -o android/gradle/wrapper/gradle-wrapper.jar
+          fi
+
       - name: Sync Capacitor
         run: npx cap sync android
 
