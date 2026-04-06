@@ -1,0 +1,5 @@
+{
+  "name": "Quick Shifter Antasena",
+  "description": "A professional motorcycle quick shifter tuning and configuration dashboard.",
+  "requestFramePermissions": ["bluetooth"]
+}
