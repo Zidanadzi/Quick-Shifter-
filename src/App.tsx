@@ -14,7 +14,6 @@ import {
   Info,
   CheckCircle2,
   AlertCircle,
-  Copy,
   FolderOpen,
   Edit3,
   LayoutGrid,
@@ -22,11 +21,8 @@ import {
   Heart,
   LogOut,
   Download,
-  Share2,
-  QrCode,
   X
 } from 'lucide-react';
-import { QRCodeSVG } from 'qrcode.react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from './lib/utils';
 
@@ -141,7 +137,6 @@ export default function App() {
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [isInIframe, setIsInIframe] = useState(false);
-  const [showQrModal, setShowQrModal] = useState(false);
 
   useEffect(() => {
     setIsInIframe(window.self !== window.top);
@@ -163,27 +158,6 @@ export default function App() {
     }
   };
 
-  const handleShare = async () => {
-    if (navigator.share) {
-      try {
-        await navigator.share({
-          title: 'Antasena Quick Shifter',
-          text: 'Check out this Quick Shifter Tuner app!',
-          url: window.location.href,
-        });
-      } catch (err) {
-        console.error('Share failed:', err);
-      }
-    } else {
-      addToast("Sharing not supported on this browser", "error");
-    }
-  };
-
-  const handleCopyLink = () => {
-    navigator.clipboard.writeText(window.location.href);
-    addToast("Link copied to clipboard!", "success");
-  };
-  
   const [profiles, setProfiles] = useState<Profile[]>(() => {
     const saved = localStorage.getItem('qs_profiles');
     if (saved) return JSON.parse(saved);
@@ -274,8 +248,11 @@ export default function App() {
     }, 3000);
   };
 
-  // Simulate Live Data
+  // Simulate Live Data (Demo Mode) - Disabled by default to prevent "demo mode" behavior
   useEffect(() => {
+    // Only simulate if not connected and if we wanted a demo mode
+    // For now, we disable it as requested by the user
+    /*
     const interval = setInterval(() => {
       setLiveRpm(prev => {
         const target = Math.random() > 0.8 ? 12000 : 4000 + Math.random() * 4000;
@@ -286,6 +263,9 @@ export default function App() {
       });
     }, 100);
     return () => clearInterval(interval);
+    */
+    setLiveRpm(0);
+    setLiveSpeed(0);
   }, []);
 
   const handleSave = () => {
@@ -628,53 +608,46 @@ export default function App() {
       <div className="max-w-7xl mx-auto space-y-8">
         {/* Header */}
         <header className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
-          <div className="flex items-center gap-5">
-            <div className="bg-brand-primary/10 p-4 rounded-2xl border border-brand-primary/20 shadow-[0_0_30px_rgba(0,255,136,0.1)]">
-              <Zap className="w-10 h-10 text-brand-primary fill-brand-primary/20" />
-            </div>
-            <div>
-              <div className="flex items-start gap-2 mb-1">
-                <h1 className="text-2xl font-black tracking-tighter uppercase italic leading-[0.85]">
-                  Quick Shifter<br />
-                  <span className="text-brand-primary">Antasena</span>
+          <div className="flex-1 flex justify-between items-center w-full lg:w-auto gap-4">
+            <div className="flex items-center gap-3 sm:gap-5">
+              <div className="bg-brand-primary/10 p-3 sm:p-4 rounded-2xl border border-brand-primary/20 shadow-[0_0_30px_rgba(0,255,136,0.1)] shrink-0">
+                <Zap className="w-8 h-8 sm:w-10 sm:h-10 text-brand-primary fill-brand-primary/20" />
+              </div>
+              <div className="min-w-0">
+                <h1 className="text-xl sm:text-2xl font-black tracking-tighter uppercase italic leading-none">
+                  <span className="block text-white mb-0.5 sm:mb-1">Quick Shifter</span>
+                  <div className="flex items-center gap-2 text-brand-primary">
+                    <span className="truncate">Antasena</span>
+                    <span className="bg-brand-primary/10 text-brand-primary px-1.5 py-0.5 rounded text-[8px] font-black tracking-tighter uppercase border border-brand-primary/20 not-italic shrink-0">Pro</span>
+                  </div>
                 </h1>
-                <span className="mt-0.5 bg-brand-primary/10 text-brand-primary px-1.5 py-0.5 rounded text-[8px] font-black tracking-tighter uppercase border border-brand-primary/20">Pro</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="flex items-center gap-1">
-                  <span className={cn("w-1.5 h-1.5 rounded-full", settings.enabled ? "bg-brand-primary animate-pulse" : "bg-red-500")} />
-                  <span className="text-[8px] font-bold uppercase tracking-widest text-gray-500">
-                    {settings.enabled ? "Active" : "Disabled"}
-                  </span>
-                </div>
-                <span className="text-gray-700 text-[8px]">•</span>
-                <div className="flex items-center gap-4">
-                  <span className="text-[8px] font-bold uppercase tracking-widest text-gray-400 flex items-center gap-1">
-                    <Heart className="w-2.5 h-2.5 text-red-500" />
-                    {userName}
-                  </span>
-                  <button 
-                    onClick={handleExit}
-                    className="flex items-center gap-1 px-2 py-1 bg-surface-800 border border-surface-700 rounded-md text-gray-500 hover:text-red-500 hover:border-red-500/30 transition-all group shadow-sm"
-                    title="Exit / Change User"
-                  >
-                    <LogOut className="w-2 h-2 group-hover:scale-110 transition-transform" />
-                    <span className="text-[7px] font-black uppercase tracking-tighter">Exit</span>
-                  </button>
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-1.5 sm:mt-2">
+                  <div className="flex items-center gap-1">
+                    <span className={cn("w-1.5 h-1.5 rounded-full", settings.enabled ? "bg-brand-primary animate-pulse" : "bg-red-500")} />
+                    <span className="text-[8px] font-bold uppercase tracking-widest text-gray-500">
+                      {settings.enabled ? "Active" : "Disabled"}
+                    </span>
+                  </div>
+                  <span className="text-gray-700 text-[8px] hidden xs:inline">•</span>
+                  <div className="flex items-center gap-1">
+                    <span className="text-[8px] font-bold uppercase tracking-widest text-gray-500">Antasena Pro</span>
+                  </div>
                 </div>
               </div>
             </div>
+
+            {/* Exit Button - Aligned with Title on the Right */}
+            <button 
+              onClick={handleExit}
+              className="flex items-center gap-2 px-4 sm:px-5 py-2.5 sm:py-3 bg-red-500/10 border border-red-500/30 rounded-2xl text-red-500 hover:bg-red-500/20 transition-all group shadow-lg shrink-0"
+              title="Exit / Change User"
+            >
+              <LogOut className="w-4 h-4 sm:w-5 sm:h-5 group-hover:scale-110 transition-transform" />
+              <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-widest">Exit</span>
+            </button>
           </div>
           
           <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto">
-            <button 
-              onClick={() => setShowQrModal(true)}
-              className="flex items-center justify-center gap-2 bg-brand-primary/20 border border-brand-primary/40 text-brand-primary px-4 py-2 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-brand-primary/30 transition-all shadow-lg"
-              title="Scan to Mobile"
-            >
-              <QrCode className="w-3.5 h-3.5" /> Scan to HP
-            </button>
-            
             {deferredPrompt && (
               <button 
                 onClick={handleInstall}
@@ -684,27 +657,6 @@ export default function App() {
               </button>
             )}
             
-            <button 
-              onClick={() => {
-                const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-                if (isIOS) {
-                  addToast("Klik ikon 'Share' lalu 'Add to Home Screen'", "info");
-                } else {
-                  addToast("Klik titik tiga (⋮) lalu 'Instal Aplikasi' atau 'Tambahkan ke Layar Utama'", "info");
-                }
-              }}
-              className="flex items-center justify-center gap-2 bg-surface-800 border border-surface-700 text-gray-400 px-4 py-2 rounded-xl font-black text-[10px] uppercase tracking-widest hover:text-brand-primary transition-all"
-            >
-              <Info className="w-3 h-3" /> Cara Instal
-            </button>
-
-            <button 
-              onClick={handleShare}
-              className="p-2 bg-surface-800 border border-surface-700 rounded-xl text-gray-400 hover:text-brand-primary transition-all"
-              title="Share App"
-            >
-              <Share2 className="w-4 h-4" />
-            </button>
             {bluetoothDevice ? (
               <button 
                 onClick={disconnectBluetooth}
@@ -923,20 +875,20 @@ export default function App() {
                 <button 
                   onClick={handleSave}
                   disabled={isSaving}
-                  className="flex items-center justify-center gap-2 bg-brand-primary text-surface-900 px-4 py-2 rounded-xl font-black text-[10px] uppercase tracking-widest hover:opacity-90 transition-all disabled:opacity-50 shadow-lg"
+                  className="flex items-center justify-center gap-2 bg-brand-primary text-surface-900 px-3 py-1.5 rounded-lg font-black text-[9px] uppercase tracking-widest hover:opacity-90 transition-all disabled:opacity-50 shadow-lg"
                 >
                   {isSaving ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}
-                  {isSaving ? "Writing..." : "Write to Device"}
+                  {isSaving ? "Writing..." : "Write"}
                 </button>
               }
             >
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-separate border-spacing-y-3">
+              <div className="w-full">
+                <table className="w-full text-left border-separate border-spacing-y-2">
                   <thead>
-                    <tr className="text-[10px] text-gray-600 uppercase tracking-[0.3em] font-black">
-                      <th className="px-4 pb-2">RPM Point</th>
-                      <th className="px-4 pb-2">Kill Time</th>
-                      <th className="px-4 pb-2 text-right">Delete</th>
+                    <tr className="text-[9px] text-gray-600 uppercase tracking-[0.2em] font-black">
+                      <th className="px-2 pb-1">RPM Point</th>
+                      <th className="px-2 pb-1">Kill Time</th>
+                      <th className="px-2 pb-1 text-right">Action</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -951,46 +903,45 @@ export default function App() {
                         return (
                           <motion.tr 
                             key={point.id}
-                            initial={{ opacity: 0, x: -20 }}
+                            initial={{ opacity: 0, x: -10 }}
                             animate={{ opacity: 1, x: 0 }}
-                            exit={{ opacity: 0, x: 20 }}
-                            className="group bg-surface-700/10 hover:bg-surface-700/30 transition-all rounded-2xl overflow-hidden"
+                            exit={{ opacity: 0, x: 10 }}
+                            className="group bg-surface-700/10 hover:bg-surface-700/20 transition-all rounded-xl overflow-hidden"
                           >
-                            <td className="py-4 px-4 first:rounded-l-2xl">
-                              <div className="flex items-center gap-4">
-                                <div className={cn("w-2 h-8 rounded-full shadow-lg", dotColor)} />
-                                <div className="relative">
+                            <td className="py-2 px-2 first:rounded-l-xl">
+                              <div className="flex items-center gap-2">
+                                <div className={cn("w-1 h-6 rounded-full", dotColor)} />
+                                <div className="relative flex-1 min-w-0">
                                   <input 
                                     type="number" 
                                     value={point.rpm === 0 ? "" : point.rpm}
                                     onChange={(e) => updatePoint(point.id, 'rpm', Number(e.target.value))}
                                     onFocus={(e) => e.target.select()}
-                                    className="bg-surface-800 border border-surface-600 rounded-xl pl-4 pr-12 py-3 w-44 font-mono text-sm text-brand-primary focus:outline-none focus:ring-2 focus:ring-brand-primary/50 focus:border-brand-primary transition-all shadow-inner"
+                                    className="bg-surface-800 border border-surface-600 rounded-lg pl-2 pr-8 py-2 w-full font-mono text-xs text-brand-primary focus:outline-none focus:ring-1 focus:ring-brand-primary/50 focus:border-brand-primary transition-all shadow-inner"
                                   />
-                                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[10px] font-black text-gray-600 tracking-tighter">RPM</span>
+                                  <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[8px] font-black text-gray-600">RPM</span>
                                 </div>
                               </div>
                             </td>
-                            <td className="py-4 px-4">
+                            <td className="py-2 px-2">
                               <div className="relative">
                                 <input 
                                   type="number" 
                                   value={point.ms === 0 ? "" : point.ms}
                                   onChange={(e) => updatePoint(point.id, 'ms', Number(e.target.value))}
                                   onFocus={(e) => e.target.select()}
-                                  className="bg-surface-800 border border-surface-600 rounded-xl pl-4 pr-10 py-3 w-32 font-mono text-sm text-brand-primary focus:outline-none focus:ring-2 focus:ring-brand-primary/50 focus:border-brand-primary transition-all shadow-inner"
+                                  className="bg-surface-800 border border-surface-600 rounded-lg pl-2 pr-7 py-2 w-full max-w-[80px] font-mono text-xs text-brand-primary focus:outline-none focus:ring-1 focus:ring-brand-primary/50 focus:border-brand-primary transition-all shadow-inner"
                                 />
-                                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[10px] font-black text-gray-600 tracking-tighter">ms</span>
+                                <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[8px] font-black text-gray-600">ms</span>
                               </div>
                             </td>
-                            <td className="py-4 px-4 text-right last:rounded-r-2xl">
+                            <td className="py-2 px-2 text-right last:rounded-r-xl">
                               <button 
                                 onClick={() => removePoint(point.id)}
-                                className="inline-flex items-center gap-2 p-3 text-gray-600 hover:text-red-500 hover:bg-red-500/10 rounded-xl transition-all opacity-30 group-hover:opacity-100 focus:opacity-100"
+                                className="inline-flex items-center justify-center p-2 text-red-500/50 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-all"
                                 title="Remove Point"
                               >
-                                <span className="text-[10px] font-black hidden group-hover:inline tracking-widest">DELETE</span>
-                                <Trash2 className="w-4 h-4" />
+                                <Trash2 className="w-3.5 h-3.5" />
                               </button>
                             </td>
                           </motion.tr>
@@ -1001,16 +952,16 @@ export default function App() {
                 </table>
               </div>
               
-              <div className="mt-6 flex flex-col sm:flex-row items-center justify-between gap-6">
-                <p className="text-[10px] text-gray-600 font-bold flex items-center gap-2 px-2 uppercase tracking-widest">
-                  <Info className="w-3.5 h-3.5" />
-                  Hover row to reveal delete button
+              <div className="mt-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+                <p className="text-[8px] text-gray-600 font-bold flex items-center gap-1.5 px-1 uppercase tracking-widest">
+                  <Info className="w-3 h-3" />
+                  Manage points for precise mapping
                 </p>
                 <button 
                   onClick={addPoint}
-                  className="w-full sm:w-auto flex items-center justify-center gap-3 py-4 px-8 border-2 border-dashed border-surface-700 rounded-2xl text-gray-500 hover:text-brand-primary hover:border-brand-primary hover:bg-brand-primary/5 transition-all font-black uppercase text-[10px] tracking-[0.3em]"
+                  className="w-full sm:w-auto flex items-center justify-center gap-2 py-3 px-6 border-2 border-dashed border-surface-700 rounded-xl text-gray-500 hover:text-brand-primary hover:border-brand-primary hover:bg-brand-primary/5 transition-all font-black uppercase text-[9px] tracking-[0.2em]"
                 >
-                  <Plus className="w-4 h-4" /> Add Mapping Point
+                  <Plus className="w-3.5 h-3.5" /> Add Point
                 </button>
               </div>
             </Card>
@@ -1018,54 +969,6 @@ export default function App() {
         </div>
       </div>
 
-      {/* QR Code Modal */}
-      <AnimatePresence>
-        {showQrModal && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-            <motion.div 
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              className="bg-surface-900 border border-surface-800 p-8 rounded-3xl max-w-sm w-full relative shadow-2xl"
-            >
-              <button 
-                onClick={() => setShowQrModal(false)}
-                className="absolute top-4 right-4 p-2 text-gray-500 hover:text-white transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
-
-              <div className="text-center space-y-6">
-                <div className="space-y-2">
-                  <h3 className="text-xl font-black uppercase tracking-widest text-white">Buka di HP</h3>
-                  <p className="text-gray-400 text-xs">Scan QR code ini dengan kamera HP Anda untuk membuka aplikasi secara langsung.</p>
-                </div>
-
-                <div className="bg-white p-4 rounded-2xl inline-block shadow-inner mx-auto">
-                  <QRCodeSVG 
-                    value={window.location.href} 
-                    size={200}
-                    level="H"
-                    includeMargin={false}
-                  />
-                </div>
-
-                <div className="space-y-3 pt-4">
-                  <button 
-                    onClick={handleCopyLink}
-                    className="w-full flex items-center justify-center gap-2 bg-surface-800 border border-surface-700 text-gray-300 py-3 rounded-xl font-bold text-xs hover:bg-surface-700 transition-all"
-                  >
-                    <Copy className="w-4 h-4" /> Salin Link Aplikasi
-                  </button>
-                  <p className="text-[10px] text-gray-500 italic">
-                    Setelah terbuka di Chrome Android, klik titik tiga (⋮) lalu pilih "Instal Aplikasi".
-                  </p>
-                </div>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
     </div>
   );
 }
