@@ -618,18 +618,51 @@ export default function App() {
           <View style={styles.pointsList}>
             {settings.killTimes.map((point) => (
               <View key={point.id} style={styles.pointItem}>
-                <View style={styles.pointInfo}>
-                  <Text style={styles.pointRpm}>{point.rpm} RPM</Text>
-                  <Text style={styles.pointMs}>{point.ms}ms</Text>
-                </View>
-                <View style={styles.pointControls}>
-                  <View style={styles.controlGroup}>
-                    <TouchableOpacity onPress={() => updatePoint(point.id, 'ms', Math.max(10, point.ms - 5))} style={styles.btnControl}><Text style={styles.btnControlText}>-</Text></TouchableOpacity>
-                    <Text style={styles.controlValue}>{point.ms}</Text>
-                    <TouchableOpacity onPress={() => updatePoint(point.id, 'ms', Math.min(200, point.ms + 5))} style={styles.btnControl}><Text style={styles.btnControlText}>+</Text></TouchableOpacity>
+                <View style={styles.pointControlsWrapper}>
+                  {/* RPM Control */}
+                  <View style={styles.pointControlHalf}>
+                    <Text style={styles.pointControlLabel}>ENGINE RPM</Text>
+                    <View style={styles.controlGroup}>
+                      <TouchableOpacity onPress={() => updatePoint(point.id, 'rpm', Math.max(1000, point.rpm - 500))} style={styles.btnControl}>
+                        <Text style={styles.btnControlText}>-</Text>
+                      </TouchableOpacity>
+                      <TextInput 
+                        style={styles.pointInput}
+                        value={point.rpm.toString()}
+                        onChangeText={(val) => updatePoint(point.id, 'rpm', parseInt(val) || 0)}
+                        keyboardType="numeric"
+                        maxLength={5}
+                      />
+                      <TouchableOpacity onPress={() => updatePoint(point.id, 'rpm', Math.min(16000, point.rpm + 500))} style={styles.btnControl}>
+                        <Text style={styles.btnControlText}>+</Text>
+                      </TouchableOpacity>
+                    </View>
                   </View>
-                  <TouchableOpacity onPress={() => removePoint(point.id)} style={styles.btnRemove}><Trash2 color="#ef4444" size={14} /></TouchableOpacity>
+
+                  {/* MS Control */}
+                  <View style={styles.pointControlHalf}>
+                    <Text style={styles.pointControlLabel}>KILL TIME (ms)</Text>
+                    <View style={styles.controlGroup}>
+                      <TouchableOpacity onPress={() => updatePoint(point.id, 'ms', Math.max(10, point.ms - 5))} style={styles.btnControl}>
+                        <Text style={styles.btnControlText}>-</Text>
+                      </TouchableOpacity>
+                      <TextInput 
+                        style={styles.pointInput}
+                        value={point.ms.toString()}
+                        onChangeText={(val) => updatePoint(point.id, 'ms', parseInt(val) || 0)}
+                        keyboardType="numeric"
+                        maxLength={3}
+                      />
+                      <TouchableOpacity onPress={() => updatePoint(point.id, 'ms', Math.min(200, point.ms + 5))} style={styles.btnControl}>
+                        <Text style={styles.btnControlText}>+</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
                 </View>
+                
+                <TouchableOpacity onPress={() => removePoint(point.id)} style={styles.btnRemovePoint}>
+                  <Trash2 color="#ef4444" size={16} />
+                </TouchableOpacity>
               </View>
             ))}
           </View>
@@ -745,15 +778,14 @@ const styles = StyleSheet.create({
   btnAddPointText: { color: '#00ff88', fontSize: 10, fontWeight: 'bold' },
   pointsList: { gap: 10 },
   pointItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#161616', padding: 12, borderRadius: 16 },
-  pointInfo: { flexDirection: 'row', alignItems: 'center', gap: 15 },
-  pointRpm: { color: '#fff', fontSize: 13, fontWeight: '900' },
-  pointMs: { color: '#00ff88', fontSize: 13, fontWeight: '900' },
-  pointControls: { flexDirection: 'row', alignItems: 'center', gap: 15 },
-  controlGroup: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#0a0a0a', padding: 4, borderRadius: 10 },
+  pointControlsWrapper: { flex: 1, flexDirection: 'row', gap: 10, paddingRight: 10 },
+  pointControlHalf: { flex: 1 },
+  pointControlLabel: { color: '#555', fontSize: 9, fontWeight: 'bold', marginBottom: 4, textAlign: 'center' },
+  controlGroup: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#0a0a0a', padding: 4, borderRadius: 10 },
   btnControl: { width: 28, height: 28, backgroundColor: '#222', borderRadius: 8, justifyContent: 'center', alignItems: 'center' },
   btnControlText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
-  controlValue: { color: '#fff', fontSize: 12, fontWeight: 'bold', minWidth: 25, textAlign: 'center' },
-  btnRemove: { padding: 5 },
+  pointInput: { flex: 1, color: '#fff', fontSize: 13, fontWeight: 'bold', textAlign: 'center', padding: 0 },
+  btnRemovePoint: { padding: 8, backgroundColor: '#ef444415', borderRadius: 10 },
 
   // Settings
   settingItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 15, borderBottomWidth: 1, borderBottomColor: '#1a1a1a' },
