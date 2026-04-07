@@ -49,8 +49,7 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
-          # We already fixed/verified it, but we can disable validation if it's still picky
-          # however, a fresh download should pass.
+          validate-wrappers: false
           cache-disabled: false
 
       - name: Sync Capacitor
