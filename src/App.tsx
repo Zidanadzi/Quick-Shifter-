@@ -653,7 +653,7 @@ export default function App() {
                 onClick={disconnectBluetooth}
                 className="flex-1 lg:w-56 flex items-center justify-center gap-2 bg-red-500/10 border border-red-500/30 text-red-500 px-6 py-4 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-red-500/20 transition-all"
               >
-                <BluetoothOff className="w-4 h-4" /> Disconnect
+                <BluetoothOff className="w-4 h-4" /> DISCONNECT
               </button>
             ) : (
               <button 
@@ -662,7 +662,7 @@ export default function App() {
                 className="flex-1 lg:w-56 flex items-center justify-center gap-2 bg-brand-primary/10 border border-brand-primary/30 text-brand-primary px-6 py-4 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-brand-primary/20 transition-all disabled:opacity-50"
               >
                 {isConnecting ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Bluetooth className="w-4 h-4" />}
-                {isConnecting ? connectionStage : "Connect Bluetooth"}
+                {isConnecting ? connectionStage.toUpperCase() : "CONNECT"}
               </button>
             )}
           </div>

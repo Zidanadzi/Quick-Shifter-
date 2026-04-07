@@ -544,14 +544,21 @@ export default function App() {
         {/* Connection Bar */}
         <View style={styles.connectionBar}>
           {connectedDevice ? (
-            <TouchableOpacity style={styles.btnConnection} onPress={disconnectBluetooth}>
+            <TouchableOpacity 
+              style={[styles.btnConnection, { backgroundColor: '#ef444410', borderColor: '#ef444430' }]} 
+              onPress={disconnectBluetooth}
+            >
               <BluetoothOff color="#ef4444" size={16} />
-              <Text style={[styles.btnConnectionText, {color: '#ef4444'}]}>Disconnect</Text>
+              <Text style={[styles.btnConnectionText, {color: '#ef4444'}]}>DISCONNECT</Text>
             </TouchableOpacity>
           ) : (
-            <TouchableOpacity style={styles.btnConnection} onPress={scanAndConnect} disabled={isScanning}>
+            <TouchableOpacity 
+              style={[styles.btnConnection, { backgroundColor: '#00ff8810', borderColor: '#00ff8830' }]} 
+              onPress={scanAndConnect} 
+              disabled={isScanning}
+            >
               {isScanning ? <ActivityIndicator size="small" color="#00ff88" /> : <Bluetooth color="#00ff88" size={16} />}
-              <Text style={styles.btnConnectionText}>{isScanning ? connectionStage : "Connect Bluetooth"}</Text>
+              <Text style={[styles.btnConnectionText, {color: '#00ff88'}]}>{isScanning ? connectionStage.toUpperCase() : "CONNECT"}</Text>
             </TouchableOpacity>
           )}
         </View>
