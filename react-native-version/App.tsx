@@ -716,6 +716,17 @@ export default function App() {
         {/* Connection Bar */}
         <View style={styles.connectionBar}>
           <TouchableOpacity 
+            style={[styles.btnConnection, { flex: 1, backgroundColor: connectedDevice ? '#00ff8820' : '#ef444420', flexDirection: 'row', justifyContent: 'center', alignItems: 'center', paddingVertical: 12 }]}
+            onPress={connectedDevice ? () => connectedDevice.cancelConnection() : scanAndConnect}
+          >
+            {connectedDevice ? <Bluetooth color="#00ff88" size={20} /> : <BluetoothOff color="#ef4444" size={20} />}
+            <Text style={{color: connectedDevice ? '#00ff88' : '#ef4444', fontWeight: 'bold', marginLeft: 10}}>
+              {connectedDevice ? 'CONNECTED' : 'DISCONNECTED'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+        <View style={styles.connectionBar}>
+          <TouchableOpacity 
             style={[styles.btnConnection, { flex: 1, backgroundColor: activeScreen === 'dashboard' ? '#00ff8820' : '#111' }]}
             onPress={() => setActiveScreen('dashboard')}
           >
