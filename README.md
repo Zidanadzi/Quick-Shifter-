@@ -1,6 +1,6 @@
-# Panduan Build Aplikasi Antasena QS
+# Panduan Build Aplikasi Antasena Pro (Expo Native)
 
-Aplikasi ini dapat di-build menjadi dua format utama: **PWA (Progressive Web App)** dan **Native Android (Capacitor)**.
+Aplikasi ini sekarang menggunakan **React Native (Expo)** sebagai basis utamanya untuk performa maksimal di Android.
 
 ## 1. Persiapan Awal
 Pastikan Anda sudah menginstal Node.js di komputer Anda. Setelah mendownload file ZIP dari AI Studio:
@@ -11,83 +11,41 @@ Pastikan Anda sudah menginstal Node.js di komputer Anda. Setelah mendownload fil
    npm install
    ```
 
-## 2. Build sebagai PWA (Web App)
-Format ini paling ringan dan bisa langsung di-upload ke hosting (seperti Vercel, Netlify, atau Firebase Hosting).
-1. Jalankan perintah:
+## 2. Menjalankan di HP (Development)
+1. Instal aplikasi **Expo Go** dari Play Store di HP Anda.
+2. Jalankan perintah:
    ```bash
-   npm run build
+   npx expo start
    ```
-2. Hasil build akan berada di folder `/dist`.
-3. Upload isi folder `/dist` ke server hosting Anda.
+3. Scan QR Code yang muncul menggunakan aplikasi Expo Go.
 
-## 3. Build sebagai Aplikasi Android (Native)
-Aplikasi ini sudah dikonfigurasi menggunakan **Capacitor**.
+## 3. Build APK via Expo Dev (EAS Build) - REKOMENDASI
+Ini adalah cara termudah untuk membuat file APK tanpa perlu menginstal Android Studio yang berat.
 
-### Opsi A: Menggunakan Android Studio (Paling Mudah)
-1. Pastikan Anda sudah menginstal **Android Studio**.
-2. Jalankan perintah build khusus:
+1. **Instal EAS CLI**:
    ```bash
-   npm run build:android
+   npm install -g eas-cli
    ```
-3. Buka proyek Android di Android Studio:
+2. **Login ke Akun Expo**:
    ```bash
-   npx cap open android
+   eas login
    ```
-4. Di dalam Android Studio, Anda bisa langsung menjalankan aplikasi ke HP (Run) atau membuat file APK/AAB (Build > Build Bundle(s) / APK(s)).
+3. **Jalankan Build APK**:
+   ```bash
+   eas build --platform android --profile preview
+   ```
+4. Tunggu proses build selesai di server Expo (Cloud Build). Anda akan mendapatkan link download APK setelah selesai.
 
-### Opsi B: Menggunakan Command Line (Tanpa Buka Android Studio)
-Jika Anda sudah menginstal Android SDK namun tidak ingin membuka UI Android Studio yang berat:
-1. Jalankan: `npm run build:android`
-2. Masuk ke folder android: `cd android`
-3. Jalankan perintah build Gradle:
-   - Windows: `gradlew.bat assembleDebug`
-   - Mac/Linux: `./gradlew assembleDebug`
-4. File APK hasil build akan ada di: `android/app/build/outputs/apk/debug/app-debug.apk`
+## 4. Menggunakan GitHub Actions
+Saya telah menyertakan file otomatisasi di `.github/workflows/expo-build.yml`.
+1. Ekspor proyek ini ke **GitHub** melalui menu Settings di AI Studio.
+2. Setiap kali Anda melakukan *push* kode, GitHub akan menjalankan pengecekan otomatis di tab **"Actions"**.
+3. Anda juga bisa menghubungkan repositori GitHub Anda langsung ke **Expo.dev** agar setiap perubahan di GitHub otomatis memicu build APK di server Expo.
 
-## 4. Apakah bisa menggunakan AIDE?
-Membangun proyek Capacitor di **AIDE** cukup sulit karena AIDE tidak mendukung Node.js dan npm secara bawaan. Namun, Anda bisa mencoba cara ini:
-1. Lakukan `npm run build` di komputer/cloud untuk menghasilkan folder `dist`.
-2. Lakukan `npx cap sync` untuk memperbarui folder `android`.
-3. Pindahkan folder `android` tersebut ke HP Anda.
-4. Buka folder tersebut di AIDE sebagai proyek Gradle.
-*Catatan: AIDE mungkin mengalami error jika versi Gradle yang digunakan Capacitor terlalu baru.*
-
-## 5. Rekomendasi Build Tanpa PC (Cloud Build)
-Jika Anda tidak memiliki PC yang kuat, cara terbaik adalah menggunakan **GitHub Actions**. Anda cukup upload kode ini ke GitHub, dan GitHub akan membuatkan file APK secara otomatis setiap kali Anda melakukan update.
-
-## 4. Konfigurasi Penting
-- **App ID**: `com.antasena.qs` (Bisa diubah di `capacitor.config.ts`)
-- **App Name**: `Antasena QS`
-- **Icon & Splash**: Bisa diganti di folder `android/app/src/main/res`.
-
-## 6. Cara Terbaik untuk Pengguna HP Saja (Tanpa Komputer)
-
-Jika Anda hanya menggunakan HP, ada dua cara terbaik untuk "memiliki" aplikasi ini:
-
-### Opsi A: Instal sebagai PWA (Sangat Direkomendasikan)
-Ini adalah cara paling praktis dan tidak membutuhkan build apa pun.
-1. Gunakan tombol **"Scan to HP"** yang ada di aplikasi.
-2. Buka link tersebut di **Google Chrome** HP Anda.
-3. Klik titik tiga (⋮) di pojok kanan atas Chrome.
-4. Pilih **"Instal Aplikasi"** atau **"Tambahkan ke Layar Utama"**.
-5. Aplikasi akan muncul di menu HP Anda dan bisa dibuka seperti aplikasi biasa, bahkan tanpa internet.
-
-### Opsi B: Gunakan GitHub Actions (Untuk Mendapatkan File APK)
-Jika Anda benar-benar butuh file **APK** tapi tidak punya komputer:
-1. Ekspor proyek ini ke **GitHub** (melalui menu Settings di AI Studio).
-2. Saya sudah membuatkan file otomatisasi di folder `.github/workflows/android.yml`.
-3. Setiap kali Anda melakukan perubahan kode di GitHub, server GitHub akan otomatis membuatkan file APK untuk Anda.
-4. Anda bisa mendownload file APK-nya langsung dari tab **"Actions"** di halaman GitHub Anda melalui browser HP.
-5. File APK tersebut bisa Anda instal langsung di HP Android Anda.
-
-## 7. Build Versi React Native (Expo/EAS)
-Jika Anda ingin menggunakan versi **React Native (Expo)** yang ada di folder `/react-native-version`:
-1. Masuk ke folder: `cd react-native-version`
-2. Instal dependensi: `npm install`
-3. Untuk build APK via Expo Dev (EAS):
-   - Pastikan Anda sudah login ke Expo: `npx eas login`
-   - Jalankan perintah build: `npx eas build --platform android --profile preview`
-4. Anda bisa memantau proses build di dashboard **expo.dev**.
+## 5. Konfigurasi Penting
+- **App ID**: `com.antasena.pro` (Bisa diubah di `app.json`)
+- **App Name**: `Antasena Pro`
+- **Icon & Splash**: Bisa dikonfigurasi melalui folder `assets` (jika ada) atau melalui `app.json`.
 
 ---
 *Dibuat otomatis oleh AI Studio Build.*
