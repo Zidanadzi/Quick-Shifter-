@@ -16,7 +16,7 @@
     ],
     "plugins": [
       [
-        "@config-plugins/react-native-ble-plx",
+        "react-native-ble-plx",
         {
           "isBackgroundEnabled": false,
           "modes": [
