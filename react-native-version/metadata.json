@@ -1,0 +1,5 @@
+{
+  "name": "Quick Shifter Antasena Pro",
+  "description": "A performance partner app for Quick Shifter modules.",
+  "requestFramePermissions": ["bluetooth", "geolocation"]
+}

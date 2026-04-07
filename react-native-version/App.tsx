@@ -18,6 +18,7 @@ import {
 } from 'react-native';
 import { BleManager, Device, Characteristic } from 'react-native-ble-plx';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Location from 'expo-location';
 import { 
   Zap, 
   Save, 
@@ -122,20 +123,82 @@ export default function App() {
   const [settings, setSettings] = useState<QSSettings>(INITIAL_SETTINGS);
   const [liveRpm, setLiveRpm] = useState(0);
   const [liveSpeed, setLiveSpeed] = useState(0);
+  const [gpsAccuracy, setGpsAccuracy] = useState<number | null>(null); // New
+  const [rpmOffset, setRpmOffset] = useState<number>(0);
+  const [raceHistory, setRaceHistory] = useState<any[]>([]); // New
+
+  // Load persisted data on startup
+  useEffect(() => {
+    const loadPersistedData = async () => {
+      try {
+        const savedOffset = await AsyncStorage.getItem('qs_rpm_offset');
+        if (savedOffset) setRpmOffset(parseInt(savedOffset, 10));
+
+        const savedHistory = await AsyncStorage.getItem('qs_race_history');
+        if (savedHistory) setRaceHistory(JSON.parse(savedHistory));
+      } catch (e) {
+        console.error("Failed to load persisted data", e);
+      }
+    };
+    loadPersistedData();
+  }, []);
+
+  const updateRpmOffset = async (newOffset: number) => {
+    setRpmOffset(newOffset);
+    await AsyncStorage.setItem('qs_rpm_offset', newOffset.toString());
+  };
+
+  const saveRaceHistory = async () => {
+    if (raceData['0-100'] === 0 && raceData['402m'] === 0) {
+      addToast("No valid race data to save", "error");
+      return;
+    }
+    const newItem = {
+      id: Date.now().toString(),
+      date: new Date().toLocaleString(),
+      '0-100': raceData['0-100'],
+      '60ft': raceData['60ft'],
+      '201m': raceData['201m'],
+      '402m': raceData['402m']
+    };
+    const newHistory = [newItem, ...raceHistory].slice(0, 20); // Keep last 20
+    setRaceHistory(newHistory);
+    await AsyncStorage.setItem('qs_race_history', JSON.stringify(newHistory));
+    addToast("Race saved to history", "success");
+  };
+
+  const clearRaceHistory = async () => {
+    setRaceHistory([]);
+    await AsyncStorage.removeItem('qs_race_history');
+    addToast("History cleared", "info");
+  };
   const [userName, setUserName] = useState<string>("");
   const [showSplash, setShowSplash] = useState(true);
   const [tempName, setTempName] = useState("");
   const [connectedDevice, setConnectedDevice] = useState<Device | null>(null);
   const [isScanning, setIsScanning] = useState(false);
   const [connectionStage, setConnectionStage] = useState<string>("");
+  const [isQuickShifting, setIsQuickShifting] = useState(false); // New
+  const [lastDeviceId, setLastDeviceId] = useState<string | null>(null); // New
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [activeProfileId, setActiveProfileId] = useState<string>("");
+  const [activeScreen, setActiveScreen] = useState<'dashboard' | 'racebox'>('dashboard');
   const [isEditingProfile, setIsEditingProfile] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
   const [editDesc, setEditDesc] = useState("");
   const [profileToDelete, setProfileToDelete] = useState<Profile | null>(null);
   const [isAppReady, setIsAppReady] = useState(false);
+  const [raceData, setRaceData] = useState({
+    '0-100': 0,
+    '60ft': 0,
+    '201m': 0,
+    '402m': 0,
+    startTime: 0,
+    isRacing: false,
+    distance: 0,
+    lastSpeedKmh: 0
+  });
 
   // --- Persistence ---
   useEffect(() => {
@@ -189,6 +252,49 @@ export default function App() {
       AsyncStorage.setItem('qs_profiles', JSON.stringify(profiles));
     }
   }, [profiles, isAppReady]);
+
+  // --- Location Logic ---
+  useEffect(() => {
+    (async () => {
+      let { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        addToast("Location permission denied", "error");
+        return;
+      }
+
+      await Location.watchPositionAsync(
+        {
+          accuracy: Location.Accuracy.High,
+          timeInterval: 1000,
+          distanceInterval: 1,
+        },
+        (location) => {
+          const speedKmh = (location.coords.speed || 0) * 3.6;
+          setLiveSpeed(Math.round(speedKmh));
+          setGpsAccuracy(location.coords.accuracy); // Track accuracy
+
+          // Race Logic
+          if (raceData.isRacing) {
+            const elapsed = (Date.now() - raceData.startTime) / 1000;
+            const avgSpeedMps = ((speedKmh + raceData.lastSpeedKmh) / 2) / 3.6;
+            const newDistance = raceData.distance + avgSpeedMps; // 1 second interval
+            
+            setRaceData(prev => ({ 
+              ...prev, 
+              distance: newDistance, 
+              lastSpeedKmh: speedKmh,
+              '0-100': (speedKmh >= 100 && prev['0-100'] === 0) ? elapsed : prev['0-100'],
+              '60ft': (newDistance >= 18.288 && prev['60ft'] === 0) ? elapsed : prev['60ft'],
+              '201m': (newDistance >= 201 && prev['201m'] === 0) ? elapsed : prev['201m'],
+              '402m': (newDistance >= 402 && prev['402m'] === 0) ? elapsed : prev['402m']
+            }));
+          } else {
+            setRaceData(prev => ({ ...prev, lastSpeedKmh: speedKmh }));
+          }
+        }
+      );
+    })();
+  }, []);
 
   // --- Toast System ---
   const addToast = useCallback((message: string, type: 'success' | 'error' | 'info' = 'success') => {
@@ -245,16 +351,30 @@ export default function App() {
         
         device.connect()
           .then(d => d.discoverAllServicesAndCharacteristics())
-          .then(d => {
+          .then(async d => {
             setConnectedDevice(d);
+            setLastDeviceId(d.id);
+            await AsyncStorage.setItem('qs_last_device', d.id);
             setIsScanning(false);
             setConnectionStage("Connected");
             addToast(`Connected to ${d.name || 'QS Device'}`, "success");
             
+            // Monitor for Quick Shift Feedback
+            d.monitorCharacteristicForService(SERVICE_UUID, CHAR_UUID, (error, characteristic) => {
+              if (characteristic?.value) {
+                const val = atob(characteristic.value);
+                if (val === 'QS_ACTIVE') {
+                  setIsQuickShifting(true);
+                  setTimeout(() => setIsQuickShifting(false), 500);
+                }
+              }
+            });
+
             d.onDisconnected((err, disconnectedDevice) => {
               setConnectedDevice(null);
               setConnectionStage("Disconnected");
-              addToast("Device disconnected", "info");
+              addToast("Device disconnected. Reconnecting...", "info");
+              setTimeout(attemptReconnect, 3000); // Auto-reconnect
             });
           })
           .catch(err => {
@@ -275,13 +395,54 @@ export default function App() {
     }, 10000);
   };
 
-  const disconnectBluetooth = async () => {
-    if (connectedDevice) {
-      await connectedDevice.cancelConnection();
-      setConnectedDevice(null);
-      setConnectionStage("");
+  const attemptReconnect = async () => {
+    const lastId = await AsyncStorage.getItem('qs_last_device');
+    if (lastId) {
+      setConnectionStage("Reconnecting...");
+      manager.connectToDevice(lastId)
+        .then(d => d.discoverAllServicesAndCharacteristics())
+        .then(async d => {
+          setConnectedDevice(d);
+          setConnectionStage("Connected");
+          addToast("Reconnected to device", "success");
+          
+          // Monitor for Quick Shift Feedback
+          d.monitorCharacteristicForService(SERVICE_UUID, CHAR_UUID, (error, characteristic) => {
+            if (characteristic?.value) {
+              const val = atob(characteristic.value);
+              if (val === 'QS_ACTIVE') {
+                setIsQuickShifting(true);
+                setTimeout(() => setIsQuickShifting(false), 500);
+              }
+            }
+          });
+
+          d.onDisconnected((err, disconnectedDevice) => {
+            setConnectedDevice(null);
+            setConnectionStage("Disconnected");
+            addToast("Device disconnected. Reconnecting...", "info");
+            setTimeout(attemptReconnect, 3000);
+          });
+        })
+        .catch(err => {
+          addToast("Reconnection Failed: " + err.message, "error");
+          setConnectionStage("Disconnected");
+          setTimeout(attemptReconnect, 5000);
+        });
     }
   };
+
+  // Auto-reconnect on startup
+  useEffect(() => {
+    const checkLastDevice = async () => {
+      const lastId = await AsyncStorage.getItem('qs_last_device');
+      if (lastId) {
+        setLastDeviceId(lastId);
+        attemptReconnect();
+      }
+    };
+    checkLastDevice();
+  }, []);
 
   // --- Sync Logic ---
   const syncSettings = async () => {
@@ -361,6 +522,17 @@ export default function App() {
     setProfiles(prev => prev.map(p => p.id === isEditingProfile ? { ...p, name: editName, description: editDesc } : p));
     setIsEditingProfile(null);
     addToast("Profile updated", "success");
+  };
+
+  const resetToDefault = () => {
+    Alert.alert(
+      "Reset to Default",
+      "Are you sure you want to reset all settings to factory defaults?",
+      [
+        { text: "Cancel", style: "cancel" },
+        { text: "Reset", style: "destructive", onPress: () => setSettings(JSON.parse(JSON.stringify(INITIAL_SETTINGS))) }
+      ]
+    );
   };
 
   // --- UI Handlers ---
@@ -484,7 +656,7 @@ export default function App() {
             key={toast.id} 
             entering={FadeInDown} 
             exiting={FadeOut}
-            style={[styles.toast, styles[`toast_${toast.type}` as keyof typeof styles]]}
+            style={[styles.toast, styles[`toast_${toast.type}` as keyof typeof styles]] as any}
           >
             {toast.type === 'success' ? <CheckCircle2 color="#00ff88" size={16} /> :
              toast.type === 'error' ? <AlertCircle color="#ef4444" size={16} /> :
@@ -543,220 +715,341 @@ export default function App() {
 
         {/* Connection Bar */}
         <View style={styles.connectionBar}>
-          {connectedDevice ? (
-            <TouchableOpacity 
-              style={[styles.btnConnection, { backgroundColor: '#ef444410', borderColor: '#ef444430' }]} 
-              onPress={disconnectBluetooth}
-            >
-              <BluetoothOff color="#ef4444" size={16} />
-              <Text style={[styles.btnConnectionText, {color: '#ef4444'}]}>DISCONNECT</Text>
-            </TouchableOpacity>
-          ) : (
-            <TouchableOpacity 
-              style={[styles.btnConnection, { backgroundColor: '#00ff8810', borderColor: '#00ff8830' }]} 
-              onPress={scanAndConnect} 
-              disabled={isScanning}
-            >
-              {isScanning ? <ActivityIndicator size="small" color="#00ff88" /> : <Bluetooth color="#00ff88" size={16} />}
-              <Text style={[styles.btnConnectionText, {color: '#00ff88'}]}>{isScanning ? connectionStage.toUpperCase() : "CONNECT"}</Text>
-            </TouchableOpacity>
-          )}
+          <TouchableOpacity 
+            style={[styles.btnConnection, { flex: 1, backgroundColor: activeScreen === 'dashboard' ? '#00ff8820' : '#111' }]}
+            onPress={() => setActiveScreen('dashboard')}
+          >
+            <Text style={{color: activeScreen === 'dashboard' ? '#00ff88' : '#555', fontWeight: 'bold'}}>DASHBOARD</Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={[styles.btnConnection, { flex: 1, backgroundColor: activeScreen === 'racebox' ? '#00ff8820' : '#111' }]}
+            onPress={() => setActiveScreen('racebox')}
+          >
+            <Text style={{color: activeScreen === 'racebox' ? '#00ff88' : '#555', fontWeight: 'bold'}}>RACE BOX</Text>
+          </TouchableOpacity>
         </View>
 
-        {/* Profiles Card */}
-        <Card title="Profiles" icon={LayoutGrid} subtitle="Save and load presets">
-          <View style={styles.profileList}>
-            {profiles.map(profile => (
-              <View 
-                key={profile.id} 
-                style={[styles.profileItem, activeProfileId === profile.id && styles.profileItemActive]}
-              >
-                <TouchableOpacity style={{flex: 1}} onPress={() => loadProfile(profile)}>
-                  <Text style={[styles.profileName, activeProfileId === profile.id && {color: '#00ff88'}]}>{profile.name}</Text>
-                  <Text style={styles.profileDesc} numberOfLines={1}>{profile.description}</Text>
-                </TouchableOpacity>
-                <View style={styles.profileActions}>
-                  <TouchableOpacity onPress={() => startEditing(profile)}><Edit3 color="#555" size={16} /></TouchableOpacity>
-                  <TouchableOpacity onPress={() => deleteProfile(profile.id)}><Trash2 color="#ef4444" size={16} /></TouchableOpacity>
-                </View>
-
-                {isEditingProfile === profile.id && (
-                  <View style={styles.editProfileForm}>
-                    <TextInput 
-                      style={styles.editInput} 
-                      value={editName} 
-                      onChangeText={setEditName} 
-                      placeholder="Name" 
-                      placeholderTextColor="#444" 
-                    />
-                    <TextInput 
-                      style={[styles.editInput, {height: 60}]} 
-                      value={editDesc} 
-                      onChangeText={setEditDesc} 
-                      placeholder="Description" 
-                      placeholderTextColor="#444" 
-                      multiline 
-                    />
-                    <View style={styles.editActions}>
-                      <TouchableOpacity style={styles.btnSmall} onPress={() => setIsEditingProfile(null)}><Text style={styles.btnSmallText}>Cancel</Text></TouchableOpacity>
-                      <TouchableOpacity style={[styles.btnSmall, {backgroundColor: '#00ff88'}]} onPress={updateProfileInfo}><Text style={[styles.btnSmallText, {color: '#000'}]}>Save</Text></TouchableOpacity>
+        {activeScreen === 'dashboard' ? (
+          <>
+            {/* Profiles Card */}
+            <Card title="Profiles" icon={LayoutGrid} subtitle="Save and load presets">
+              <View style={styles.profileList}>
+                {profiles.map(profile => (
+                  <View 
+                    key={profile.id} 
+                    style={[styles.profileItem, activeProfileId === profile.id && styles.profileItemActive]}
+                  >
+                    <TouchableOpacity style={{flex: 1}} onPress={() => loadProfile(profile)}>
+                      <Text style={[styles.profileName, activeProfileId === profile.id && {color: '#00ff88'}]}>{profile.name}</Text>
+                      <Text style={styles.profileDesc} numberOfLines={1}>{profile.description}</Text>
+                    </TouchableOpacity>
+                    <View style={styles.profileActions}>
+                      <TouchableOpacity onPress={() => startEditing(profile)}><Edit3 color="#555" size={16} /></TouchableOpacity>
+                      <TouchableOpacity onPress={() => deleteProfile(profile.id)}><Trash2 color="#ef4444" size={16} /></TouchableOpacity>
                     </View>
+
+                    {isEditingProfile === profile.id && (
+                      <View style={styles.editProfileForm}>
+                        <TextInput 
+                          style={styles.editInput} 
+                          value={editName} 
+                          onChangeText={setEditName} 
+                          placeholder="Name" 
+                          placeholderTextColor="#444" 
+                        />
+                        <TextInput 
+                          style={[styles.editInput, {height: 60}]} 
+                          value={editDesc} 
+                          onChangeText={setEditDesc} 
+                          placeholder="Description" 
+                          placeholderTextColor="#444" 
+                          multiline 
+                        />
+                        <View style={styles.editActions}>
+                          <TouchableOpacity style={styles.btnSmall} onPress={() => setIsEditingProfile(null)}><Text style={styles.btnSmallText}>Cancel</Text></TouchableOpacity>
+                          <TouchableOpacity style={[styles.btnSmall, {backgroundColor: '#00ff88'}]} onPress={updateProfileInfo}><Text style={[styles.btnSmallText, {color: '#000'}]}>Save</Text></TouchableOpacity>
+                        </View>
+                      </View>
+                    )}
                   </View>
+                ))}
+                <TouchableOpacity style={styles.btnAddProfile} onPress={saveNewProfile}>
+                  <Plus color="#555" size={16} />
+                  <Text style={styles.btnAddProfileText}>Create New Profile</Text>
+                </TouchableOpacity>
+              </View>
+            </Card>
+
+            {/* Telemetry Card */}
+            <Card title="Dashboard Monitor" icon={Activity} subtitle="Real-time engine data">
+              <View style={styles.telemetryRow}>
+                <View>
+                  <Text style={styles.telemetryValue}>{Math.max(0, liveRpm + rpmOffset).toLocaleString()}</Text>
+                  <Text style={styles.telemetryLabel}>RPM</Text>
+                  {isQuickShifting && (
+                    <Animated.View entering={FadeIn} exiting={FadeOut} style={styles.qsIndicator}>
+                      <Text style={styles.qsIndicatorText}>SHIFT!</Text>
+                    </Animated.View>
+                  )}
+                </View>
+                <View style={styles.telemetryDivider} />
+                <View>
+                  <Text style={styles.telemetryValue}>{liveSpeed}</Text>
+                  <Text style={styles.telemetryLabel}>KM/H</Text>
+                  {gpsAccuracy !== null && (
+                    <Text style={[styles.telemetryLabel, {fontSize: 8, color: gpsAccuracy > 15 ? '#ef4444' : '#00ff88'}]}>
+                      {gpsAccuracy > 15 ? 'LOW ACC' : 'HIGH ACC'}
+                    </Text>
+                  )}
+                </View>
+              </View>
+
+              {/* Dynamic Segmented Sporty RPM Bar */}
+              <View style={styles.rpmBarContainer}>
+                {Array.from({ length: 30 }).map((_, i) => {
+                  const maxDisplayRpm = 15000;
+                  const segmentRpm = (i / 30) * maxDisplayRpm;
+                  const currentPercentage = (liveRpm / maxDisplayRpm) * 100;
+                  const isActive = (i / 30) * 100 <= currentPercentage;
+                  
+                  const sortedPoints = [...settings.killTimes].sort((a, b) => a.rpm - b.rpm);
+                  const lastPoint = sortedPoints[sortedPoints.length - 1];
+                  const secondLastPoint = sortedPoints[sortedPoints.length - 2];
+                  
+                  let activeColor = "#00ff88"; // brand-primary
+                  
+                  if (lastPoint && segmentRpm >= lastPoint.rpm) {
+                    activeColor = "#ef4444"; // red-500
+                  } else if (secondLastPoint && segmentRpm >= secondLastPoint.rpm) {
+                    activeColor = "#facc15"; // yellow-400
+                  }
+                  
+                  return (
+                    <View 
+                      key={i}
+                      style={[
+                        styles.rpmSegment,
+                        { backgroundColor: activeColor },
+                        isActive ? styles.rpmSegmentActive : styles.rpmSegmentInactive
+                      ]}
+                    />
+                  );
+                })}
+              </View>
+            </Card>
+
+            {/* Kill Times Card */}
+            <Card 
+              title="Kill Times Mapping" 
+              icon={Zap} 
+              subtitle="Fine-tune ignition cut duration"
+              action={
+                <TouchableOpacity onPress={addPoint} style={styles.btnAddPoint}>
+                  <Plus color="#00ff88" size={14} />
+                  <Text style={styles.btnAddPointText}>Add Point</Text>
+                </TouchableOpacity>
+              }
+            >
+              <View style={styles.pointsList}>
+                {settings.killTimes.map((point) => (
+                  <View key={point.id} style={styles.pointItem}>
+                    <View style={styles.pointControlsWrapper}>
+                      {/* RPM Control */}
+                      <View style={styles.pointControlHalf}>
+                        <Text style={styles.pointControlLabel}>ENGINE RPM</Text>
+                        <View style={styles.controlGroup}>
+                          <TouchableOpacity onPress={() => updatePoint(point.id, 'rpm', Math.max(1000, point.rpm - 500))} style={styles.btnControl}>
+                            <Text style={styles.btnControlText}>-</Text>
+                          </TouchableOpacity>
+                          <TextInput 
+                            style={styles.pointInput}
+                            value={point.rpm.toString()}
+                            onChangeText={(val) => updatePoint(point.id, 'rpm', parseInt(val) || 0)}
+                            keyboardType="numeric"
+                            maxLength={5}
+                          />
+                          <TouchableOpacity onPress={() => updatePoint(point.id, 'rpm', Math.min(16000, point.rpm + 500))} style={styles.btnControl}>
+                            <Text style={styles.btnControlText}>+</Text>
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+
+                      {/* MS Control */}
+                      <View style={styles.pointControlHalf}>
+                        <Text style={styles.pointControlLabel}>KILL TIME (ms)</Text>
+                        <View style={styles.controlGroup}>
+                          <TouchableOpacity onPress={() => updatePoint(point.id, 'ms', Math.max(10, point.ms - 5))} style={styles.btnControl}>
+                            <Text style={styles.btnControlText}>-</Text>
+                          </TouchableOpacity>
+                          <TextInput 
+                            style={styles.pointInput}
+                            value={point.ms.toString()}
+                            onChangeText={(val) => updatePoint(point.id, 'ms', parseInt(val) || 0)}
+                            keyboardType="numeric"
+                            maxLength={3}
+                          />
+                          <TouchableOpacity onPress={() => updatePoint(point.id, 'ms', Math.min(200, point.ms + 5))} style={styles.btnControl}>
+                            <Text style={styles.btnControlText}>+</Text>
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+                    </View>
+                    
+                    <TouchableOpacity onPress={() => removePoint(point.id)} style={styles.btnRemovePoint}>
+                      <Trash2 color="#ef4444" size={16} />
+                    </TouchableOpacity>
+                  </View>
+                ))}
+              </View>
+            </Card>
+
+            {/* General Settings */}
+            <Card 
+              title="System Parameters" 
+              icon={Settings} 
+              subtitle="Core configuration"
+              action={
+                <TouchableOpacity onPress={resetToDefault} style={styles.btnSmall}>
+                  <RefreshCw color="#ef4444" size={14} />
+                  <Text style={[styles.btnSmallText, {color: '#ef4444'}]}>Reset</Text>
+                </TouchableOpacity>
+              }
+            >
+              <View style={styles.settingItem}>
+                <View>
+                  <Text style={styles.settingLabel}>Sensor Threshold</Text>
+                  <Text style={styles.settingHint}>Sensitivity of the shift sensor</Text>
+                </View>
+                <View style={styles.settingValueRow}>
+                  <TouchableOpacity onPress={() => setSettings({...settings, threshold: Math.max(10, settings.threshold - 5)})} style={styles.btnControl}><Text style={styles.btnControlText}>-</Text></TouchableOpacity>
+                  <Text style={styles.settingValueText}>{settings.threshold}%</Text>
+                  <TouchableOpacity onPress={() => setSettings({...settings, threshold: Math.min(100, settings.threshold + 5)})} style={styles.btnControl}><Text style={styles.btnControlText}>+</Text></TouchableOpacity>
+                </View>
+              </View>
+
+              <View style={styles.settingItem}>
+                <View>
+                  <Text style={styles.settingLabel}>Minimum RPM</Text>
+                  <Text style={styles.settingHint}>System active above this RPM</Text>
+                </View>
+                <View style={styles.settingValueRow}>
+                  <TouchableOpacity onPress={() => setSettings({...settings, minRpm: Math.max(1000, settings.minRpm - 500)})} style={styles.btnControl}><Text style={styles.btnControlText}>-</Text></TouchableOpacity>
+                  <Text style={styles.settingValueText}>{settings.minRpm}</Text>
+                  <TouchableOpacity onPress={() => setSettings({...settings, minRpm: Math.min(10000, settings.minRpm + 500)})} style={styles.btnControl}><Text style={styles.btnControlText}>+</Text></TouchableOpacity>
+                </View>
+              </View>
+
+              <View style={[styles.settingItem, { borderBottomWidth: 0 }]}>
+                <View>
+                  <Text style={styles.settingLabel}>RPM Calibration</Text>
+                  <Text style={styles.settingHint}>Offset to match physical tachometer</Text>
+                </View>
+                <View style={styles.settingValueRow}>
+                  <TouchableOpacity onPress={() => updateRpmOffset(rpmOffset - 100)} style={styles.btnControl}><Text style={styles.btnControlText}>-</Text></TouchableOpacity>
+                  <Text style={styles.settingValueText}>{rpmOffset > 0 ? `+${rpmOffset}` : rpmOffset}</Text>
+                  <TouchableOpacity onPress={() => updateRpmOffset(rpmOffset + 100)} style={styles.btnControl}><Text style={styles.btnControlText}>+</Text></TouchableOpacity>
+                </View>
+              </View>
+            </Card>
+
+            {/* Apply Button */}
+            <TouchableOpacity style={styles.btnApply} onPress={syncSettings}>
+              <Save color="#000" size={20} />
+              <Text style={styles.btnApplyText}>SAVE</Text>
+            </TouchableOpacity>
+          </>
+        ) : (
+          <Card title="Race Box" icon={Zap} subtitle="Performance metrics">
+            <View style={styles.raceDataContainer}>
+              <View style={styles.raceDataRow}>
+                <Text style={styles.raceDataLabel}>0-100 km/h</Text>
+                <Text style={styles.raceDataValue}>{raceData['0-100'].toFixed(2)}s</Text>
+              </View>
+              <View style={styles.raceDataRow}>
+                <Text style={styles.raceDataLabel}>60ft</Text>
+                <Text style={styles.raceDataValue}>{raceData['60ft'].toFixed(2)}s</Text>
+              </View>
+              <View style={styles.raceDataRow}>
+                <Text style={styles.raceDataLabel}>201m</Text>
+                <Text style={styles.raceDataValue}>{raceData['201m'].toFixed(2)}s</Text>
+              </View>
+              <View style={styles.raceDataRow}>
+                <Text style={styles.raceDataLabel}>402m</Text>
+                <Text style={styles.raceDataValue}>{raceData['402m'].toFixed(2)}s</Text>
+              </View>
+              <View style={{flexDirection: 'row', gap: 10, marginTop: 20}}>
+                <TouchableOpacity 
+                  style={[styles.btnPrimary, {flex: 1, backgroundColor: raceData.isRacing ? '#ef4444' : '#00ff88'}]} 
+                  onPress={() => {
+                    if (raceData.isRacing) {
+                      setRaceData(prev => ({...prev, isRacing: false}));
+                    } else {
+                      setRaceData(prev => ({...prev, isRacing: true, startTime: Date.now(), distance: 0, '0-100': 0, '60ft': 0, '201m': 0, '402m': 0}));
+                    }
+                  }}
+                >
+                  <Text style={styles.btnPrimaryText}>{raceData.isRacing ? 'STOP' : 'GET STARTED'}</Text>
+                </TouchableOpacity>
+                {!raceData.isRacing && (raceData['0-100'] > 0 || raceData['402m'] > 0) ? (
+                  <TouchableOpacity 
+                    style={[styles.btnPrimary, {flex: 1, backgroundColor: '#3b82f6'}]} 
+                    onPress={saveRaceHistory}
+                  >
+                    <Text style={[styles.btnPrimaryText, {color: '#fff'}]}>SAVE</Text>
+                  </TouchableOpacity>
+                ) : (
+                  <TouchableOpacity 
+                    style={[styles.btnPrimary, {flex: 1, backgroundColor: '#222'}]} 
+                    onPress={() => setRaceData(prev => ({...prev, isRacing: false, distance: 0, '0-100': 0, '60ft': 0, '201m': 0, '402m': 0}))}
+                  >
+                    <Text style={[styles.btnPrimaryText, {color: '#fff'}]}>RESET</Text>
+                  </TouchableOpacity>
                 )}
               </View>
-            ))}
-            <TouchableOpacity style={styles.btnAddProfile} onPress={saveNewProfile}>
-              <Plus color="#555" size={16} />
-              <Text style={styles.btnAddProfileText}>Create New Profile</Text>
-            </TouchableOpacity>
-          </View>
-        </Card>
-
-        {/* Telemetry Card */}
-        <Card title="Dashboard Monitor" icon={Activity} subtitle="Real-time engine data">
-          <View style={styles.telemetryRow}>
-            <View>
-              <Text style={styles.telemetryValue}>{liveRpm.toLocaleString()}</Text>
-              <Text style={styles.telemetryLabel}>RPM</Text>
             </View>
-            <View style={styles.telemetryDivider} />
-            <View>
-              <Text style={styles.telemetryValue}>{liveSpeed}</Text>
-              <Text style={styles.telemetryLabel}>KM/H</Text>
-            </View>
-          </View>
+          </Card>
+        )}
 
-          {/* Dynamic Segmented Sporty RPM Bar */}
-          <View style={styles.rpmBarContainer}>
-            {Array.from({ length: 30 }).map((_, i) => {
-              const maxDisplayRpm = 15000;
-              const segmentRpm = (i / 30) * maxDisplayRpm;
-              const currentPercentage = (liveRpm / maxDisplayRpm) * 100;
-              const isActive = (i / 30) * 100 <= currentPercentage;
-              
-              const sortedPoints = [...settings.killTimes].sort((a, b) => a.rpm - b.rpm);
-              const lastPoint = sortedPoints[sortedPoints.length - 1];
-              const secondLastPoint = sortedPoints[sortedPoints.length - 2];
-              
-              let activeColor = "#00ff88"; // brand-primary
-              
-              if (lastPoint && segmentRpm >= lastPoint.rpm) {
-                activeColor = "#ef4444"; // red-500
-              } else if (secondLastPoint && segmentRpm >= secondLastPoint.rpm) {
-                activeColor = "#facc15"; // yellow-400
-              }
-              
-              return (
-                <View 
-                  key={i}
-                  style={[
-                    styles.rpmSegment,
-                    { backgroundColor: activeColor },
-                    isActive ? styles.rpmSegmentActive : styles.rpmSegmentInactive
-                  ]}
-                />
-              );
-            })}
-          </View>
-        </Card>
-
-        {/* Kill Times Card */}
-        <Card 
-          title="Kill Times Mapping" 
-          icon={Zap} 
-          subtitle="Fine-tune ignition cut duration"
-          action={
-            <TouchableOpacity onPress={addPoint} style={styles.btnAddPoint}>
-              <Plus color="#00ff88" size={14} />
-              <Text style={styles.btnAddPointText}>Add Point</Text>
-            </TouchableOpacity>
-          }
-        >
-          <View style={styles.pointsList}>
-            {settings.killTimes.map((point) => (
-              <View key={point.id} style={styles.pointItem}>
-                <View style={styles.pointControlsWrapper}>
-                  {/* RPM Control */}
-                  <View style={styles.pointControlHalf}>
-                    <Text style={styles.pointControlLabel}>ENGINE RPM</Text>
-                    <View style={styles.controlGroup}>
-                      <TouchableOpacity onPress={() => updatePoint(point.id, 'rpm', Math.max(1000, point.rpm - 500))} style={styles.btnControl}>
-                        <Text style={styles.btnControlText}>-</Text>
-                      </TouchableOpacity>
-                      <TextInput 
-                        style={styles.pointInput}
-                        value={point.rpm.toString()}
-                        onChangeText={(val) => updatePoint(point.id, 'rpm', parseInt(val) || 0)}
-                        keyboardType="numeric"
-                        maxLength={5}
-                      />
-                      <TouchableOpacity onPress={() => updatePoint(point.id, 'rpm', Math.min(16000, point.rpm + 500))} style={styles.btnControl}>
-                        <Text style={styles.btnControlText}>+</Text>
-                      </TouchableOpacity>
+        {/* Race History Section */}
+        {activeScreen === 'racebox' && raceHistory.length > 0 && (
+          <Card 
+            title="Race History" 
+            icon={Activity} 
+            subtitle="Previous runs"
+            action={
+              <TouchableOpacity onPress={clearRaceHistory} style={styles.btnSmall}>
+                <Trash2 color="#ef4444" size={14} />
+                <Text style={[styles.btnSmallText, {color: '#ef4444'}]}>Clear</Text>
+              </TouchableOpacity>
+            }
+          >
+            <View style={styles.historyList}>
+              {raceHistory.map((item) => (
+                <View key={item.id} style={styles.historyItem}>
+                  <Text style={styles.historyDate}>{item.date}</Text>
+                  <View style={styles.historyMetrics}>
+                    <View style={styles.historyMetric}>
+                      <Text style={styles.historyMetricLabel}>0-100</Text>
+                      <Text style={styles.historyMetricValue}>{item['0-100'].toFixed(2)}s</Text>
                     </View>
-                  </View>
-
-                  {/* MS Control */}
-                  <View style={styles.pointControlHalf}>
-                    <Text style={styles.pointControlLabel}>KILL TIME (ms)</Text>
-                    <View style={styles.controlGroup}>
-                      <TouchableOpacity onPress={() => updatePoint(point.id, 'ms', Math.max(10, point.ms - 5))} style={styles.btnControl}>
-                        <Text style={styles.btnControlText}>-</Text>
-                      </TouchableOpacity>
-                      <TextInput 
-                        style={styles.pointInput}
-                        value={point.ms.toString()}
-                        onChangeText={(val) => updatePoint(point.id, 'ms', parseInt(val) || 0)}
-                        keyboardType="numeric"
-                        maxLength={3}
-                      />
-                      <TouchableOpacity onPress={() => updatePoint(point.id, 'ms', Math.min(200, point.ms + 5))} style={styles.btnControl}>
-                        <Text style={styles.btnControlText}>+</Text>
-                      </TouchableOpacity>
+                    <View style={styles.historyMetric}>
+                      <Text style={styles.historyMetricLabel}>60ft</Text>
+                      <Text style={styles.historyMetricValue}>{item['60ft'].toFixed(2)}s</Text>
+                    </View>
+                    <View style={styles.historyMetric}>
+                      <Text style={styles.historyMetricLabel}>201m</Text>
+                      <Text style={styles.historyMetricValue}>{item['201m'].toFixed(2)}s</Text>
+                    </View>
+                    <View style={styles.historyMetric}>
+                      <Text style={styles.historyMetricLabel}>402m</Text>
+                      <Text style={styles.historyMetricValue}>{item['402m'].toFixed(2)}s</Text>
                     </View>
                   </View>
                 </View>
-                
-                <TouchableOpacity onPress={() => removePoint(point.id)} style={styles.btnRemovePoint}>
-                  <Trash2 color="#ef4444" size={16} />
-                </TouchableOpacity>
-              </View>
-            ))}
-          </View>
-        </Card>
-
-        {/* General Settings */}
-        <Card title="System Parameters" icon={Settings} subtitle="Core configuration">
-          <View style={styles.settingItem}>
-            <View>
-              <Text style={styles.settingLabel}>Sensor Threshold</Text>
-              <Text style={styles.settingHint}>Sensitivity of the shift sensor</Text>
+              ))}
             </View>
-            <View style={styles.settingValueRow}>
-              <TouchableOpacity onPress={() => setSettings({...settings, threshold: Math.max(10, settings.threshold - 5)})} style={styles.btnControl}><Text style={styles.btnControlText}>-</Text></TouchableOpacity>
-              <Text style={styles.settingValueText}>{settings.threshold}%</Text>
-              <TouchableOpacity onPress={() => setSettings({...settings, threshold: Math.min(100, settings.threshold + 5)})} style={styles.btnControl}><Text style={styles.btnControlText}>+</Text></TouchableOpacity>
-            </View>
-          </View>
-
-          <View style={styles.settingItem}>
-            <View>
-              <Text style={styles.settingLabel}>Minimum RPM</Text>
-              <Text style={styles.settingHint}>System active above this RPM</Text>
-            </View>
-            <View style={styles.settingValueRow}>
-              <TouchableOpacity onPress={() => setSettings({...settings, minRpm: Math.max(1000, settings.minRpm - 500)})} style={styles.btnControl}><Text style={styles.btnControlText}>-</Text></TouchableOpacity>
-              <Text style={styles.settingValueText}>{settings.minRpm}</Text>
-              <TouchableOpacity onPress={() => setSettings({...settings, minRpm: Math.min(10000, settings.minRpm + 500)})} style={styles.btnControl}><Text style={styles.btnControlText}>+</Text></TouchableOpacity>
-            </View>
-          </View>
-        </Card>
-
-        {/* Apply Button */}
-        <TouchableOpacity style={styles.btnApply} onPress={syncSettings}>
-          <Save color="#000" size={20} />
-          <Text style={styles.btnApplyText}>APPLY TO MODULE</Text>
-        </TouchableOpacity>
+          </Card>
+        )}
 
       </ScrollView>
     </SafeAreaView>
@@ -826,6 +1119,18 @@ const styles = StyleSheet.create({
 
   // Telemetry
   telemetryRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around', paddingVertical: 10 },
+  qsIndicator: {
+    backgroundColor: '#ef4444',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 4,
+    marginTop: 4,
+  },
+  qsIndicatorText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: 'bold',
+  },
   telemetryValue: { color: '#00ff88', fontSize: 42, fontWeight: '900', textAlign: 'center' },
   telemetryLabel: { color: '#444', fontSize: 11, fontWeight: 'bold', textAlign: 'center', marginTop: 5 },
   telemetryDivider: { width: 1, height: 40, backgroundColor: '#222' },
@@ -870,6 +1175,20 @@ const styles = StyleSheet.create({
   // Modal
   modalOverlay: { flex: 1, backgroundColor: '#000000aa', justifyContent: 'center', alignItems: 'center', padding: 20 },
   modalContent: { width: '100%', backgroundColor: '#111', borderRadius: 30, padding: 30, borderWidth: 1, borderColor: '#222' },
+  raceDataContainer: { padding: 20 },
+  raceDataRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 15, borderBottomWidth: 1, borderBottomColor: '#222' },
+  raceDataLabel: { color: '#888', fontSize: 16 },
+  raceDataValue: { color: '#fff', fontSize: 18, fontWeight: 'bold' },
+  
+  // History
+  historyList: { gap: 10 },
+  historyItem: { backgroundColor: '#161616', padding: 15, borderRadius: 16, borderWidth: 1, borderColor: '#222' },
+  historyDate: { color: '#888', fontSize: 10, fontWeight: 'bold', marginBottom: 10 },
+  historyMetrics: { flexDirection: 'row', justifyContent: 'space-between' },
+  historyMetric: { alignItems: 'center' },
+  historyMetricLabel: { color: '#555', fontSize: 9, fontWeight: 'bold', marginBottom: 4 },
+  historyMetricValue: { color: '#fff', fontSize: 14, fontWeight: '900' },
+
   modalHeader: { flexDirection: 'row', alignItems: 'center', gap: 15, marginBottom: 20 },
   modalTitle: { color: '#fff', fontSize: 18, fontWeight: '900' },
   modalSubtitle: { color: '#444', fontSize: 10, fontWeight: 'bold', marginTop: 2 },
