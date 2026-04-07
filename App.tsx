@@ -25,11 +25,11 @@ import {
 } from 'react-native-reanimated';
 
 // Import Screens
-import LoginSplashScreen from './src/screens/LoginSplashScreen';
-import QuickShifterScreen from './src/screens/QuickShifterScreen';
-import RaceboxScreen from './src/screens/RaceboxScreen';
-import SettingsScreen from './src/screens/SettingsScreen';
-import ProfileScreen from './src/screens/ProfileScreen';
+import LoginSplashScreen from '@/screens/LoginSplashScreen';
+import QuickShifterScreen from '@/screens/QuickShifterScreen';
+import RaceboxScreen from '@/screens/RaceboxScreen';
+import SettingsScreen from '@/screens/SettingsScreen';
+import ProfileScreen from '@/screens/ProfileScreen';
 
 const bleManager = new BleManager();
 
@@ -225,7 +225,7 @@ export default function App() {
   if (!isAppReady) {
     return (
       <LoginSplashScreen 
-        onNameSubmit={(name) => {
+        onNameSubmit={(name: string) => {
           setUserName(name);
           setIsAppReady(true);
         }} 
