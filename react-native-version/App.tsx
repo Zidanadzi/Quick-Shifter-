@@ -296,8 +296,37 @@ export default function App() {
     })();
   }, []);
 
-  // --- Toast System ---
-  const addToast = useCallback((message: string, type: 'success' | 'error' | 'info' = 'success') => {
+  // Request permissions on app start
+  useEffect(() => {
+    requestBluetoothPermissions();
+  }, []);
+
+  // Auto-reconnect logic
+  useEffect(() => {
+    const subscription = manager.onStateChange((state) => {
+      if (state === 'PoweredOn') {
+        AsyncStorage.getItem('qs_last_device').then((deviceId) => {
+          if (deviceId && !connectedDevice) {
+            // Attempt to reconnect to last device
+            manager.connectToDevice(deviceId)
+              .then(d => d.discoverAllServicesAndCharacteristics())
+              .then(d => {
+                setConnectedDevice(d);
+                setLastDeviceId(d.id);
+                addToast("Auto-reconnected to device", "success");
+                
+                d.onDisconnected((err, disconnectedDevice) => {
+                  setConnectedDevice(null);
+                  addToast("Device disconnected", "error");
+                });
+              })
+              .catch(err => console.log("Auto-reconnect failed", err));
+          }
+        });
+      }
+    }, true);
+    return () => subscription.remove();
+  }, [connectedDevice]);
     const id = Math.random().toString(36).substr(2, 9);
     setToasts(prev => [...prev, { id, message, type }]);
     setTimeout(() => {
@@ -312,10 +341,12 @@ export default function App() {
         const result = await PermissionsAndroid.requestMultiple([
           PermissionsAndroid.PERMISSIONS.BLUETOOTH_SCAN,
           PermissionsAndroid.PERMISSIONS.BLUETOOTH_CONNECT,
+          PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
         ]);
         return (
           result['android.permission.BLUETOOTH_CONNECT'] === PermissionsAndroid.RESULTS.GRANTED &&
-          result['android.permission.BLUETOOTH_SCAN'] === PermissionsAndroid.RESULTS.GRANTED
+          result['android.permission.BLUETOOTH_SCAN'] === PermissionsAndroid.RESULTS.GRANTED &&
+          result['android.permission.ACCESS_FINE_LOCATION'] === PermissionsAndroid.RESULTS.GRANTED
         );
       } else {
         const result = await PermissionsAndroid.request(
@@ -965,8 +996,10 @@ export default function App() {
 
             {/* Apply Button */}
             <TouchableOpacity style={styles.btnApply} onPress={syncSettings}>
-              <Save color="#000" size={20} />
-              <Text style={styles.btnApplyText}>SAVE</Text>
+              <View style={{flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 12}}>
+                <Save color="#000" size={20} />
+                <Text style={styles.btnApplyText}>SAVE</Text>
+              </View>
             </TouchableOpacity>
           </>
         ) : (
