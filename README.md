@@ -80,5 +80,14 @@ Jika Anda benar-benar butuh file **APK** tapi tidak punya komputer:
 4. Anda bisa mendownload file APK-nya langsung dari tab **"Actions"** di halaman GitHub Anda melalui browser HP.
 5. File APK tersebut bisa Anda instal langsung di HP Android Anda.
 
+## 7. Build Versi React Native (Expo/EAS)
+Jika Anda ingin menggunakan versi **React Native (Expo)** yang ada di folder `/react-native-version`:
+1. Masuk ke folder: `cd react-native-version`
+2. Instal dependensi: `npm install`
+3. Untuk build APK via Expo Dev (EAS):
+   - Pastikan Anda sudah login ke Expo: `npx eas login`
+   - Jalankan perintah build: `npx eas build --platform android --profile preview`
+4. Anda bisa memantau proses build di dashboard **expo.dev**.
+
 ---
 *Dibuat otomatis oleh AI Studio Build.*

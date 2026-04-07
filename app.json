@@ -1,0 +1,46 @@
+{
+  "expo": {
+    "name": "Antasena Pro",
+    "slug": "quick-shifter-",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "plugins": [
+      [
+        "react-native-ble-plx",
+        {
+          "isBackgroundEnabled": false,
+          "modes": [
+            "peripheral",
+            "central"
+          ],
+          "bluetoothAlwaysPermission": "Allow Antasena Pro to use Bluetooth."
+        }
+      ]
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.antasena.qs.pro"
+    },
+    "android": {
+      "package": "com.antasena.qs.pro",
+      "permissions": [
+        "android.permission.BLUETOOTH",
+        "android.permission.BLUETOOTH_ADMIN",
+        "android.permission.BLUETOOTH_SCAN",
+        "android.permission.BLUETOOTH_CONNECT",
+        "android.permission.ACCESS_FINE_LOCATION"
+      ]
+    },
+    "web": {
+    },
+    "extra": {
+      "eas": {
+        "projectId": "df85ebec-c8c0-4992-bd7a-590bcd5fa508"
+      }
+    }
+  }
+}
