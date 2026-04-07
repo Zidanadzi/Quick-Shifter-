@@ -37,7 +37,6 @@ interface QSSettings {
   threshold: number;
   minRpm: number;
   killTimes: KillTimePoint[];
-  enabled: boolean;
 }
 
 interface Toast {
@@ -64,7 +63,6 @@ const INITIAL_SETTINGS: QSSettings = {
     { id: '3', rpm: 9000, ms: 65 },
     { id: '4', rpm: 12000, ms: 55 },
   ],
-  enabled: true,
 };
 
 const QS_SERVICE_UUID = '0000ff00-0000-1000-8000-00805f9b34fb'; // Quick Shifter Service UUID
@@ -201,7 +199,6 @@ export default function App() {
           const payload = JSON.stringify({
             t: settings.threshold,
             m: settings.minRpm,
-            e: settings.enabled,
             k: settings.killTimes.map(p => [p.rpm, p.ms])
           });
           await settingsCharacteristic.writeValue(encoder.encode(payload));
@@ -623,13 +620,7 @@ export default function App() {
                 </h1>
                 <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-1.5 sm:mt-2">
                   <div className="flex items-center gap-1">
-                    <span className={cn("w-1.5 h-1.5 rounded-full", settings.enabled ? "bg-brand-primary animate-pulse" : "bg-red-500")} />
-                    <span className="text-[8px] font-bold uppercase tracking-widest text-gray-500">
-                      {settings.enabled ? "Active" : "Disabled"}
-                    </span>
-                  </div>
-                  <span className="text-gray-700 text-[8px] hidden xs:inline">•</span>
-                  <div className="flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-brand-primary animate-pulse" />
                     <span className="text-[8px] font-bold uppercase tracking-widest text-gray-500">Antasena Pro</span>
                   </div>
                 </div>
@@ -674,21 +665,6 @@ export default function App() {
                 {isConnecting ? connectionStage : "Connect Bluetooth"}
               </button>
             )}
-
-            <button 
-              onClick={() => {
-                setSettings({...settings, enabled: !settings.enabled});
-                addToast(settings.enabled ? "System Disabled" : "System Enabled", settings.enabled ? "error" : "success");
-              }}
-              className={cn(
-                "flex-1 lg:w-56 px-6 py-4 rounded-2xl font-black text-xs uppercase tracking-widest transition-all border",
-                settings.enabled 
-                  ? "bg-red-500/10 border-red-500/30 text-red-500 hover:bg-red-500/20" 
-                  : "bg-brand-primary/10 border-brand-primary/30 text-brand-primary hover:bg-brand-primary/20"
-              )}
-            >
-              {settings.enabled ? "Kill System" : "Ignite System"}
-            </button>
           </div>
         </header>
 

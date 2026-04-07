@@ -13,7 +13,8 @@ import {
   TextInput,
   Modal,
   Platform,
-  ActivityIndicator
+  ActivityIndicator,
+  PermissionsAndroid
 } from 'react-native';
 import { BleManager, Device, Characteristic } from 'react-native-ble-plx';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -64,7 +65,6 @@ interface QSSettings {
   threshold: number;
   minRpm: number;
   killTimes: KillTimePoint[];
-  enabled: boolean;
 }
 
 interface Toast {
@@ -91,7 +91,6 @@ const INITIAL_SETTINGS: QSSettings = {
     { id: '3', rpm: 9000, ms: 65 },
     { id: '4', rpm: 12000, ms: 55 },
   ],
-  enabled: true,
 };
 
 const SERVICE_UUID = '0000ff00-0000-1000-8000-00805f9b34fb';
@@ -201,7 +200,34 @@ export default function App() {
   }, []);
 
   // --- Bluetooth Logic ---
+  const requestBluetoothPermissions = async () => {
+    if (Platform.OS === 'android') {
+      if (Platform.Version >= 31) {
+        const result = await PermissionsAndroid.requestMultiple([
+          PermissionsAndroid.PERMISSIONS.BLUETOOTH_SCAN,
+          PermissionsAndroid.PERMISSIONS.BLUETOOTH_CONNECT,
+        ]);
+        return (
+          result['android.permission.BLUETOOTH_CONNECT'] === PermissionsAndroid.RESULTS.GRANTED &&
+          result['android.permission.BLUETOOTH_SCAN'] === PermissionsAndroid.RESULTS.GRANTED
+        );
+      } else {
+        const result = await PermissionsAndroid.request(
+          PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION
+        );
+        return result === PermissionsAndroid.RESULTS.GRANTED;
+      }
+    }
+    return true;
+  };
+
   const scanAndConnect = async () => {
+    const hasPermissions = await requestBluetoothPermissions();
+    if (!hasPermissions) {
+      addToast("Bluetooth permissions denied", "error");
+      return;
+    }
+
     setIsScanning(true);
     setConnectionStage("Scanning...");
     
@@ -267,7 +293,6 @@ export default function App() {
     const payload = JSON.stringify({
       t: settings.threshold,
       m: settings.minRpm,
-      e: settings.enabled,
       k: settings.killTimes.map(p => [p.rpm, p.ms])
     });
 
@@ -529,14 +554,6 @@ export default function App() {
               <Text style={styles.btnConnectionText}>{isScanning ? connectionStage : "Connect Bluetooth"}</Text>
             </TouchableOpacity>
           )}
-          <TouchableOpacity 
-            style={[styles.btnConnection, {backgroundColor: settings.enabled ? '#ef444410' : '#00ff8810', borderColor: settings.enabled ? '#ef444430' : '#00ff8830'}]} 
-            onPress={() => setSettings({...settings, enabled: !settings.enabled})}
-          >
-            <Text style={[styles.btnConnectionText, {color: settings.enabled ? '#ef4444' : '#00ff88'}]}>
-              {settings.enabled ? "Kill System" : "Ignite System"}
-            </Text>
-          </TouchableOpacity>
         </View>
 
         {/* Profiles Card */}
@@ -600,6 +617,39 @@ export default function App() {
               <Text style={styles.telemetryValue}>{liveSpeed}</Text>
               <Text style={styles.telemetryLabel}>KM/H</Text>
             </View>
+          </View>
+
+          {/* Dynamic Segmented Sporty RPM Bar */}
+          <View style={styles.rpmBarContainer}>
+            {Array.from({ length: 30 }).map((_, i) => {
+              const maxDisplayRpm = 15000;
+              const segmentRpm = (i / 30) * maxDisplayRpm;
+              const currentPercentage = (liveRpm / maxDisplayRpm) * 100;
+              const isActive = (i / 30) * 100 <= currentPercentage;
+              
+              const sortedPoints = [...settings.killTimes].sort((a, b) => a.rpm - b.rpm);
+              const lastPoint = sortedPoints[sortedPoints.length - 1];
+              const secondLastPoint = sortedPoints[sortedPoints.length - 2];
+              
+              let activeColor = "#00ff88"; // brand-primary
+              
+              if (lastPoint && segmentRpm >= lastPoint.rpm) {
+                activeColor = "#ef4444"; // red-500
+              } else if (secondLastPoint && segmentRpm >= secondLastPoint.rpm) {
+                activeColor = "#facc15"; // yellow-400
+              }
+              
+              return (
+                <View 
+                  key={i}
+                  style={[
+                    styles.rpmSegment,
+                    { backgroundColor: activeColor },
+                    isActive ? styles.rpmSegmentActive : styles.rpmSegmentInactive
+                  ]}
+                />
+              );
+            })}
           </View>
         </Card>
 
@@ -772,6 +822,10 @@ const styles = StyleSheet.create({
   telemetryValue: { color: '#00ff88', fontSize: 42, fontWeight: '900', textAlign: 'center' },
   telemetryLabel: { color: '#444', fontSize: 11, fontWeight: 'bold', textAlign: 'center', marginTop: 5 },
   telemetryDivider: { width: 1, height: 40, backgroundColor: '#222' },
+  rpmBarContainer: { flexDirection: 'row', height: 24, width: '100%', gap: 2, marginTop: 20 },
+  rpmSegment: { flex: 1, borderRadius: 2 },
+  rpmSegmentActive: { opacity: 1, transform: [{ scaleY: 1.2 }] },
+  rpmSegmentInactive: { opacity: 0.15 },
 
   // Kill Times
   btnAddPoint: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#00ff8815', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8 },
