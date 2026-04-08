@@ -1,0 +1,50 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+}
+
+:root {
+  --bg: #0A0A0A;
+  --card: #121212;
+  --card-border: #1E1E1E;
+  --accent: #00FFD4; /* Bluish Neon Green / Aquamarine */
+  --accent-glow: rgba(0, 255, 212, 0.4);
+  --text-primary: #FFFFFF;
+  --text-secondary: #8E8E8E;
+  --danger: #FF0000; /* Pure Red */
+  --danger-bg: rgba(255, 0, 0, 0.1);
+}
+
+.text-neon {
+  color: var(--accent);
+  text-shadow: 0 0 10px var(--accent-glow), 0 0 20px rgba(0, 255, 212, 0.2);
+}
+
+.text-neon-red {
+  color: var(--danger);
+  text-shadow: 0 0 10px rgba(255, 0, 0, 0.4);
+}
+
+body {
+  background-color: var(--bg);
+  color: var(--text-primary);
+  font-family: 'Inter', sans-serif;
+  margin: 0;
+  padding: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.glow-green {
+  box-shadow: 0 0 20px var(--accent-glow);
+}
+
+.glow-red {
+  box-shadow: 0 0 20px rgba(255, 82, 82, 0.2);
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 0px;
+}

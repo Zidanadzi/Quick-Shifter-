@@ -1,46 +1,41 @@
 {
   "expo": {
     "name": "Antasena Pro",
-    "slug": "quick-shifter-",
+    "slug": "antasena-pro-native",
     "version": "1.0.0",
     "orientation": "portrait",
+    "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0A0A0A"
+    },
     "assetBundlePatterns": [
       "**/*"
     ],
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0A0A0A"
+      },
+      "package": "com.antasena.pro"
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
     "plugins": [
       [
         "react-native-ble-plx",
         {
-          "isBackgroundEnabled": false,
-          "modes": [
-            "peripheral",
-            "central"
-          ],
+          "isBackgroundEnabled": true,
+          "modes": ["peripheral", "central"],
           "bluetoothAlwaysPermission": "Allow Antasena Pro to use Bluetooth."
         }
       ]
-    ],
-    "ios": {
-      "supportsTablet": true,
-      "bundleIdentifier": "com.antasena.qs.pro"
-    },
-    "android": {
-      "package": "com.antasena.qs.pro",
-      "permissions": [
-        "android.permission.BLUETOOTH",
-        "android.permission.BLUETOOTH_ADMIN",
-        "android.permission.BLUETOOTH_SCAN",
-        "android.permission.BLUETOOTH_CONNECT",
-        "android.permission.ACCESS_FINE_LOCATION"
-      ]
-    },
-    "web": {
-    },
-    "extra": {
-      "eas": {
-        "projectId": "df85ebec-c8c0-4992-bd7a-590bcd5fa508"
-      }
-    }
+    ]
   }
 }
