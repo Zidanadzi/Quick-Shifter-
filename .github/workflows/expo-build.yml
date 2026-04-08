@@ -42,5 +42,8 @@ jobs:
       - name: Install Dependencies
         run: npm install
 
+      - name: Install EAS CLI
+        run: npm install -g eas-cli
+
       - name: Build Android Preview
         run: npx eas build --platform android --profile preview --non-interactive
