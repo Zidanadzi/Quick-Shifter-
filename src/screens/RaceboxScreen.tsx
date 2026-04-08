@@ -1,11 +1,16 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { Timer, Flag, Zap, Gauge } from 'lucide-react-native';
 
 interface RaceResults {
   time0to100: number;
+  speed0to100: number;
   time60ft: number;
+  speed60ft: number;
   time201m: number;
+  speed201m: number;
   time402m: number;
+  speed402m: number;
   maxSpeed: number;
   distance: number;
 }
@@ -27,12 +32,29 @@ export default function RaceboxScreen({
   stopRace,
   resetRace,
 }: RaceboxProps) {
-  const renderMetric = (label: string, value: number) => (
+  const renderMetric = (label: string, time: number, speed?: number, suffix: string = 's', icon?: React.ReactNode) => (
     <View style={styles.metricRow}>
-      <Text style={styles.metricLabel}>{label}</Text>
-      <Text style={styles.metricValue}>{value.toFixed(2)}s</Text>
+      <View style={styles.metricLabelContainer}>
+        {icon && <View style={styles.metricIcon}>{icon}</View>}
+        <Text style={styles.metricLabel}>{label}</Text>
+      </View>
+      <View style={styles.metricValueContainer}>
+        <Text style={styles.metricValue}>{time > 0 ? time.toFixed(2) : '--'}{time > 0 ? suffix : ''}</Text>
+        {speed !== undefined && (
+          <Text style={styles.metricSpeedValue}>
+            {time > 0 ? ` | ${Math.round(speed)} km/h` : ' | -- km/h'}
+          </Text>
+        )}
+      </View>
     </View>
   );
+
+  const formatTime = (timeInSeconds: number) => {
+    const mins = Math.floor(timeInSeconds / 60);
+    const secs = Math.floor(timeInSeconds % 60);
+    const ms = Math.floor((timeInSeconds % 1) * 100);
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}.${ms.toString().padStart(2, '0')}`;
+  };
 
   return (
     <View style={styles.container}>
@@ -47,12 +69,19 @@ export default function RaceboxScreen({
         </View>
       </View>
 
+      {/* HUD Timer */}
+      <View style={styles.hudContainer}>
+        <Text style={styles.hudTime}>{formatTime(currentRaceTime)}</Text>
+        <Text style={styles.hudLabel}>{isRaceStarted ? 'RACING...' : 'READY'}</Text>
+      </View>
+
       {/* Metrics Card */}
       <View style={styles.card}>
-        {renderMetric('0-100 km/h', raceResults.time0to100)}
-        {renderMetric('60ft', raceResults.time60ft)}
-        {renderMetric('201m', raceResults.time201m)}
-        {renderMetric('402m', raceResults.time402m)}
+        {renderMetric('0-100 km/h', raceResults.time0to100, raceResults.speed0to100, 's', <Gauge size={16} color="#00e5ff" />)}
+        {renderMetric('60ft', raceResults.time60ft, raceResults.speed60ft, 's', <Timer size={16} color="#00e5ff" />)}
+        {renderMetric('201m', raceResults.time201m, raceResults.speed201m, 's', <Flag size={16} color="#00e5ff" />)}
+        {renderMetric('402m', raceResults.time402m, raceResults.speed402m, 's', <Flag size={16} color="#00e5ff" />)}
+        {renderMetric('Top Speed', raceResults.maxSpeed, undefined, ' km/h', <Zap size={16} color="#00e5ff" />)}
       </View>
 
       {/* Buttons */}
@@ -67,7 +96,7 @@ export default function RaceboxScreen({
         </TouchableOpacity>
         
         <TouchableOpacity style={[styles.button, styles.secondaryButton]} onPress={resetRace}>
-          <Text style={styles.buttonText}>RESET</Text>
+          <Text style={styles.buttonTextSecondary}>RESET</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -83,21 +112,21 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 30,
+    marginBottom: 20,
     marginTop: 20,
   },
   iconBox: {
     width: 50,
     height: 50,
     borderRadius: 12,
-    backgroundColor: '#1a2e22',
+    backgroundColor: 'rgba(0, 229, 255, 0.1)',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 15,
   },
   iconText: {
     fontSize: 24,
-    color: '#22c55e',
+    color: '#00e5ff',
   },
   title: {
     fontSize: 20,
@@ -107,6 +136,29 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: 14,
     color: '#94a3b8',
+  },
+  hudContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 30,
+    backgroundColor: '#111',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#222',
+    marginBottom: 20,
+  },
+  hudTime: {
+    fontSize: 48,
+    fontWeight: 'bold',
+    color: '#00e5ff',
+    fontVariant: ['tabular-nums'],
+  },
+  hudLabel: {
+    fontSize: 14,
+    color: '#94a3b8',
+    marginTop: 5,
+    fontWeight: 'bold',
+    letterSpacing: 2,
   },
   card: {
     backgroundColor: '#111',
@@ -119,18 +171,39 @@ const styles = StyleSheet.create({
   metricRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'center',
     paddingVertical: 15,
     borderBottomWidth: 1,
     borderBottomColor: '#222',
   },
+  metricLabelContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  metricIcon: {
+    marginRight: 10,
+    backgroundColor: 'rgba(0, 229, 255, 0.1)',
+    padding: 6,
+    borderRadius: 8,
+  },
   metricLabel: {
     fontSize: 16,
     color: '#94a3b8',
+    fontWeight: '500',
+  },
+  metricValueContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   metricValue: {
     fontSize: 18,
     fontWeight: 'bold',
     color: '#fff',
+  },
+  metricSpeedValue: {
+    fontSize: 14,
+    color: '#00e5ff',
+    fontWeight: 'bold',
   },
   buttonContainer: {
     flexDirection: 'row',
@@ -148,10 +221,17 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#000',
   },
+  buttonTextSecondary: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#fff',
+  },
   primaryButton: {
-    backgroundColor: '#22c55e', // Neon green
+    backgroundColor: '#00e5ff', // Aquamarine
   },
   secondaryButton: {
-    backgroundColor: '#222', // Dark gray
+    backgroundColor: '#111', // Dark gray
+    borderWidth: 1,
+    borderColor: '#333',
   },
 });

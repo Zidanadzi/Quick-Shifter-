@@ -63,9 +63,13 @@ export default function App() {
   const [currentRaceTime, setCurrentRaceTime] = useState(0);
   const [raceResults, setRaceResults] = useState({
     time0to100: 0,
+    speed0to100: 0,
     time60ft: 0,
+    speed60ft: 0,
     time201m: 0,
+    speed201m: 0,
     time402m: 0,
+    speed402m: 0,
     maxSpeed: 0,
     distance: 0
   });
@@ -199,9 +203,13 @@ export default function App() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
     setRaceResults({
       time0to100: 0,
+      speed0to100: 0,
       time60ft: 0,
+      speed60ft: 0,
       time201m: 0,
+      speed201m: 0,
       time402m: 0,
+      speed402m: 0,
       maxSpeed: 0,
       distance: 0
     });
@@ -226,15 +234,25 @@ export default function App() {
           setRaceResults(prev => {
             const newResults = { ...prev };
             if (currentSpeed > prev.maxSpeed) newResults.maxSpeed = currentSpeed;
-            if (currentSpeed >= 100 && prev.time0to100 === 0) newResults.time0to100 = elapsed;
+            if (currentSpeed >= 100 && prev.time0to100 === 0) {
+              newResults.time0to100 = elapsed;
+              newResults.speed0to100 = currentSpeed;
+            }
             
             const deltaDist = (location.coords.speed || 0) * 0.1;
             newResults.distance += deltaDist;
 
-            if (newResults.distance >= DISTANCE_60FT && prev.time60ft === 0) newResults.time60ft = elapsed;
-            if (newResults.distance >= DISTANCE_201M && prev.time201m === 0) newResults.time201m = elapsed;
+            if (newResults.distance >= DISTANCE_60FT && prev.time60ft === 0) {
+              newResults.time60ft = elapsed;
+              newResults.speed60ft = currentSpeed;
+            }
+            if (newResults.distance >= DISTANCE_201M && prev.time201m === 0) {
+              newResults.time201m = elapsed;
+              newResults.speed201m = currentSpeed;
+            }
             if (newResults.distance >= DISTANCE_402M && prev.time402m === 0) {
               newResults.time402m = elapsed;
+              newResults.speed402m = currentSpeed;
               stopRace();
               Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
               Toast.show({ type: 'success', text1: 'Race Finished!' });
@@ -260,9 +278,13 @@ export default function App() {
     setCurrentRaceTime(0);
     setRaceResults({
       time0to100: 0,
+      speed0to100: 0,
       time60ft: 0,
+      speed60ft: 0,
       time201m: 0,
+      speed201m: 0,
       time402m: 0,
+      speed402m: 0,
       maxSpeed: 0,
       distance: 0
     });
@@ -314,7 +336,7 @@ export default function App() {
 
   const renderSignalIcon = () => {
     if (!isConnected || rssi === null) return <SignalZero size={16} color="#ef4444" />;
-    if (rssi > -60) return <SignalHigh size={16} color="#22c55e" />;
+    if (rssi > -60) return <SignalHigh size={16} color="#00e5ff" />;
     if (rssi > -80) return <SignalMedium size={16} color="#eab308" />;
     return <SignalLow size={16} color="#ef4444" />;
   };
@@ -399,21 +421,22 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   proText: {
-    color: '#22c55e',
+    color: '#00e5ff',
   },
   connBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: '#1a0a0a',
-    paddingHorizontal: 15,
+    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+    paddingHorizontal: 12,
     paddingVertical: 8,
-    borderRadius: 8,
+    borderRadius: 20,
     borderWidth: 1,
-    borderColor: '#7f1d1d',
+    borderColor: '#ef4444',
   },
   connBtnActive: {
-    borderColor: '#22c55e',
+    borderColor: '#00e5ff',
+    backgroundColor: 'rgba(0, 229, 255, 0.1)',
   },
   connBtnText: {
     color: '#ef4444',
@@ -421,13 +444,13 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   connBtnTextActive: {
-    color: '#22c55e',
+    color: '#00e5ff',
   },
   exitBtn: {
-    backgroundColor: '#1a0a0a',
-    paddingHorizontal: 15,
+    backgroundColor: '#111',
+    paddingHorizontal: 12,
     paddingVertical: 8,
-    borderRadius: 8,
+    borderRadius: 20,
     borderWidth: 1,
     borderColor: '#7f1d1d',
   },
@@ -438,27 +461,28 @@ const styles = StyleSheet.create({
   },
   tabBar: {
     flexDirection: 'row',
-    paddingHorizontal: 20,
+    marginHorizontal: 20,
     marginBottom: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#222',
+    backgroundColor: '#111',
+    borderRadius: 12,
+    padding: 4,
   },
   tabItem: {
     flex: 1,
-    paddingVertical: 15,
+    paddingVertical: 10,
     alignItems: 'center',
-    borderBottomWidth: 2,
-    borderBottomColor: 'transparent',
+    borderRadius: 8,
   },
   tabItemActive: {
-    borderBottomColor: '#22c55e',
+    backgroundColor: '#222',
   },
   tabText: {
-    color: '#94a3b8',
+    color: '#64748b',
     fontWeight: 'bold',
+    fontSize: 14,
   },
   tabTextActive: {
-    color: '#22c55e',
+    color: '#00e5ff',
   },
   scrollContent: {
     padding: 20,
