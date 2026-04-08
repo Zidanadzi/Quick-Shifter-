@@ -1,25 +1,4 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
-
-interface RaceResults {
-  time0to100: number;
-  time60ft: number;
-  time201m: number;
-  time402m: number;
-  maxSpeed: number;
-  distance: number;
-}
-
-interface RaceboxProps {
-  isRaceStarted: boolean;
-  currentRaceTime: number;
-  raceResults: RaceResults;
-  startRace: () => Promise<void>;
-  stopRace: () => void;
-  resetRace: () => void;
-}
-
-import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 
 interface RaceResults {
