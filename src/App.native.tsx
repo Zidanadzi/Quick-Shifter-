@@ -9,6 +9,7 @@ import {
   StatusBar,
   Alert,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Location from 'expo-location';
 import { BleManager, Device } from 'react-native-ble-plx';
 import { 
@@ -69,6 +70,16 @@ export default function App() {
   const rpmValue = useSharedValue(0);
 
   useEffect(() => {
+    // Check for saved user name
+    const checkUser = async () => {
+      const savedName = await AsyncStorage.getItem('userName');
+      if (savedName) {
+        setUserName(savedName);
+        setIsAppReady(true);
+      }
+    };
+    checkUser();
+
     (async () => {
       let { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
@@ -83,6 +94,12 @@ export default function App() {
       bleManager.destroy();
     };
   }, []);
+
+  const handleNameSubmit = async (name: string) => {
+    await AsyncStorage.setItem('userName', name);
+    setUserName(name);
+    setIsAppReady(true);
+  };
 
   useEffect(() => {
     rpmValue.value = withSpring(rpm / 12000);
@@ -216,7 +233,10 @@ export default function App() {
           />
         );
       case 'profile':
-        return <ProfileScreen userName={userName} />;
+        return <ProfileScreen userName={userName} onLogout={() => {
+          setUserName('');
+          setIsAppReady(false);
+        }} />;
       default:
         return <QuickShifterScreen rpm={rpm} speed={speed} rpmValue={rpmValue} />;
     }
@@ -225,10 +245,7 @@ export default function App() {
   if (!isAppReady) {
     return (
       <LoginSplashScreen 
-        onNameSubmit={(name: string) => {
-          setUserName(name);
-          setIsAppReady(true);
-        }} 
+        onNameSubmit={handleNameSubmit} 
       />
     );
   }

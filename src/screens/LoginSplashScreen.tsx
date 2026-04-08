@@ -13,13 +13,13 @@ export default function LoginSplashScreen({ onNameSubmit }: LoginSplashScreenPro
   useEffect(() => {
     Animated.timing(fadeAnim, {
       toValue: 1,
-      duration: 2000,
+      duration: 1500,
       useNativeDriver: true,
     }).start();
 
     const timer = setTimeout(() => {
       setShowInput(true);
-    }, 2500);
+    }, 1500);
 
     return () => clearTimeout(timer);
   }, [fadeAnim]);
@@ -33,12 +33,13 @@ export default function LoginSplashScreen({ onNameSubmit }: LoginSplashScreenPro
   return (
     <View style={styles.container}>
       <Animated.View style={[styles.logoContainer, { opacity: fadeAnim }]}>
-        <Text style={styles.logoText}>Quick Shifter</Text>
-        <Text style={styles.tagline}>Precision Performance</Text>
+        <Text style={styles.logoText}>Antasena Pro</Text>
+        <Text style={styles.tagline}>Your Performance Partner</Text>
       </Animated.View>
 
       {showInput && (
         <Animated.View style={styles.inputContainer}>
+          <Text style={styles.greetingText}>Hi there! What should I call you, Partner?</Text>
           <TextInput
             style={styles.input}
             placeholder="Enter your name"
@@ -48,7 +49,7 @@ export default function LoginSplashScreen({ onNameSubmit }: LoginSplashScreenPro
             autoFocus
           />
           <TouchableOpacity style={styles.button} onPress={handleSubmit}>
-            <Text style={styles.buttonText}>START</Text>
+            <Text style={styles.buttonText}>Let's Ride!</Text>
           </TouchableOpacity>
         </Animated.View>
       )}
@@ -59,7 +60,7 @@ export default function LoginSplashScreen({ onNameSubmit }: LoginSplashScreenPro
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#000',
+    backgroundColor: '#0f172a',
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
@@ -71,13 +72,19 @@ const styles = StyleSheet.create({
   logoText: {
     fontSize: 42,
     fontWeight: 'bold',
-    color: '#fff',
+    color: '#22c55e',
     letterSpacing: 2,
   },
   tagline: {
     fontSize: 16,
-    color: '#666',
+    color: '#94a3b8',
     marginTop: 10,
+    textAlign: 'center',
+  },
+  greetingText: {
+    fontSize: 18,
+    color: '#fff',
+    marginBottom: 20,
     textAlign: 'center',
   },
   inputContainer: {
@@ -88,25 +95,25 @@ const styles = StyleSheet.create({
   input: {
     width: '100%',
     height: 50,
-    backgroundColor: '#111',
+    backgroundColor: '#1e293b',
     borderRadius: 10,
     color: '#fff',
     paddingHorizontal: 15,
     fontSize: 16,
     borderWidth: 1,
-    borderColor: '#333',
+    borderColor: '#334155',
     marginBottom: 20,
   },
   button: {
     width: '100%',
     height: 50,
-    backgroundColor: '#fff',
+    backgroundColor: '#22c55e',
     borderRadius: 10,
     justifyContent: 'center',
     alignItems: 'center',
   },
   buttonText: {
-    color: '#000',
+    color: '#fff',
     fontSize: 16,
     fontWeight: 'bold',
     letterSpacing: 1,

@@ -3,6 +3,7 @@
     "name": "Antasena Pro",
     "slug": "antasena-pro-native",
     "version": "1.0.0",
+    "runtimeVersion": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
@@ -11,11 +12,15 @@
       "resizeMode": "contain",
       "backgroundColor": "#0A0A0A"
     },
+    "updates": {
+      "url": "https://u.expo.dev/df85ebec-c8c0-4992-bd7a-590bcd5fa508"
+    },
     "assetBundlePatterns": [
       "**/*"
     ],
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.antasena.pro"
     },
     "android": {
       "adaptiveIcon": {
@@ -23,6 +28,11 @@
         "backgroundColor": "#0A0A0A"
       },
       "package": "com.antasena.pro"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "df85ebec-c8c0-4992-bd7a-590bcd5fa508"
+      }
     },
     "web": {
       "favicon": "./assets/favicon.png"
