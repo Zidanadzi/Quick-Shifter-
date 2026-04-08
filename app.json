@@ -13,7 +13,7 @@
       "backgroundColor": "#0A0A0A"
     },
     "updates": {
-      "url": "https://u.expo.dev/df85ebec-c8c0-4992-bd7a-590bcd5fa508"
+      "url": "https://u.expo.dev/e8f086e3-db68-4a64-91d1-0c42a801e3a3"
     },
     "assetBundlePatterns": [
       "**/*"
@@ -31,7 +31,7 @@
     },
     "extra": {
       "eas": {
-        "projectId": "df85ebec-c8c0-4992-bd7a-590bcd5fa508"
+        "projectId": "e8f086e3-db68-4a64-91d1-0c42a801e3a3"
       }
     },
     "web": {
