@@ -8,17 +8,25 @@ import {
   SafeAreaView,
   StatusBar,
   Alert,
+  PermissionsAndroid,
+  Platform,
+  BackHandler,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Location from 'expo-location';
+import * as Haptics from 'expo-haptics';
+import Toast from 'react-native-toast-message';
 import { BleManager, Device } from 'react-native-ble-plx';
 import { 
-  Bluetooth, 
-  BluetoothOff, 
   Settings, 
   Gauge, 
   Timer, 
-  User
+  User,
+  Signal,
+  SignalHigh,
+  SignalMedium,
+  SignalLow,
+  SignalZero
 } from 'lucide-react-native';
 import { 
   useSharedValue, 
@@ -47,6 +55,7 @@ export default function App() {
   const [connectedDevice, setConnectedDevice] = useState<Device | null>(null);
   const [rpm, setRpm] = useState(0);
   const [speed, setSpeed] = useState(0);
+  const [rssi, setRssi] = useState<number | null>(null);
   
   // Racebox State
   const [isRaceStarted, setIsRaceStarted] = useState(false);
@@ -102,11 +111,47 @@ export default function App() {
   };
 
   useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (isConnected && connectedDevice) {
+      interval = setInterval(async () => {
+        try {
+          const device = await connectedDevice.readRSSI();
+          setRssi(device.rssi);
+        } catch (e) {
+          console.log('Failed to read RSSI', e);
+        }
+      }, 2000);
+    } else {
+      setRssi(null);
+    }
+    return () => clearInterval(interval);
+  }, [isConnected, connectedDevice]);
+
+  useEffect(() => {
     rpmValue.value = withSpring(rpm / 12000);
   }, [rpm]);
 
   // Bluetooth Logic
-  const scanAndConnect = () => {
+  const requestBluetoothPermissions = async () => {
+    if (Platform.OS === 'android') {
+      const granted = await PermissionsAndroid.requestMultiple([
+        PermissionsAndroid.PERMISSIONS.BLUETOOTH_SCAN,
+        PermissionsAndroid.PERMISSIONS.BLUETOOTH_CONNECT,
+        PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+      ]);
+      return granted['android.permission.BLUETOOTH_CONNECT'] === 'granted';
+    }
+    return true;
+  };
+
+  const scanAndConnect = async () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    const hasPermission = await requestBluetoothPermissions();
+    if (!hasPermission) {
+      Alert.alert('Permission Denied', 'Bluetooth permissions are required to connect.');
+      return;
+    }
+
     bleManager.startDeviceScan(null, null, (error, device) => {
       if (error) {
         console.log(error);
@@ -118,6 +163,16 @@ export default function App() {
           .then((device) => {
             setConnectedDevice(device);
             setIsConnected(true);
+            Toast.show({ type: 'success', text1: 'Connected to Antasena QS' });
+            
+            // Auto-reconnect listener
+            device.onDisconnected((error, disconnectedDevice) => {
+              setIsConnected(false);
+              setConnectedDevice(null);
+              Toast.show({ type: 'error', text1: 'Disconnected', text2: 'Attempting to reconnect...' });
+              setTimeout(scanAndConnect, 5000);
+            });
+
             return device.discoverAllServicesAndCharacteristics();
           })
           .catch((error) => {
@@ -128,17 +183,20 @@ export default function App() {
   };
 
   const disconnect = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     if (connectedDevice) {
       connectedDevice.cancelConnection()
         .then(() => {
           setIsConnected(false);
           setConnectedDevice(null);
+          Toast.show({ type: 'info', text1: 'Disconnected' });
         });
     }
   };
 
   // Racebox Logic
   const startRace = async () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
     setRaceResults({
       time0to100: 0,
       time60ft: 0,
@@ -178,6 +236,8 @@ export default function App() {
             if (newResults.distance >= DISTANCE_402M && prev.time402m === 0) {
               newResults.time402m = elapsed;
               stopRace();
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+              Toast.show({ type: 'success', text1: 'Race Finished!' });
             }
             return newResults;
           });
@@ -188,6 +248,7 @@ export default function App() {
   };
 
   const stopRace = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setIsRaceStarted(false);
     if (locationSubscription) {
       locationSubscription.remove();
@@ -196,7 +257,6 @@ export default function App() {
   };
 
   const resetRace = () => {
-    stopRace();
     setCurrentRaceTime(0);
     setRaceResults({
       time0to100: 0,
@@ -208,10 +268,26 @@ export default function App() {
     });
   };
 
+  const handleExit = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+    Alert.alert('Exit App', 'Are you sure you want to exit?', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Yes', onPress: () => BackHandler.exitApp() },
+    ]);
+  };
+
+  const handleResetRace = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    Alert.alert('Reset Race', 'Are you sure you want to reset race results?', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Yes', onPress: resetRace },
+    ]);
+  };
+
   const renderScreen = () => {
     switch (activeTab) {
       case 'dashboard':
-        return <QuickShifterScreen rpm={rpm} speed={speed} rpmValue={rpmValue} />;
+        return <QuickShifterScreen rpm={rpm} speed={speed} />;
       case 'racebox':
         return (
           <RaceboxScreen 
@@ -220,25 +296,11 @@ export default function App() {
             raceResults={raceResults}
             startRace={startRace}
             stopRace={stopRace}
-            resetRace={resetRace}
+            resetRace={handleResetRace}
           />
         );
-      case 'settings':
-        return (
-          <SettingsScreen 
-            killTimes={killTimes}
-            setKillTimes={setKillTimes}
-            minRpm={minRpm}
-            setMinRpm={setMinRpm}
-          />
-        );
-      case 'profile':
-        return <ProfileScreen userName={userName} onLogout={() => {
-          setUserName('');
-          setIsAppReady(false);
-        }} />;
       default:
-        return <QuickShifterScreen rpm={rpm} speed={speed} rpmValue={rpmValue} />;
+        return <QuickShifterScreen rpm={rpm} speed={speed} />;
     }
   };
 
@@ -250,66 +312,59 @@ export default function App() {
     );
   }
 
+  const renderSignalIcon = () => {
+    if (!isConnected || rssi === null) return <SignalZero size={16} color="#ef4444" />;
+    if (rssi > -60) return <SignalHigh size={16} color="#22c55e" />;
+    if (rssi > -80) return <SignalMedium size={16} color="#eab308" />;
+    return <SignalLow size={16} color="#ef4444" />;
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" />
       
       {/* Header */}
       <View style={styles.header}>
-        <View>
-          <Text style={styles.welcomeText}>Antasena Pro</Text>
-          <Text style={styles.userName}>{activeTab === 'racebox' ? 'Racebox' : 'Quick Shifter'}</Text>
+        <View style={styles.logoContainer}>
+          <Text style={styles.logoText}>QUICK SHIFTER</Text>
+          <Text style={styles.logoSubText}>ANTASENA <Text style={styles.proText}>PRO</Text></Text>
         </View>
+        <View style={styles.headerActions}>
+          <TouchableOpacity 
+            onPress={isConnected ? disconnect : scanAndConnect}
+            style={[styles.connBtn, isConnected && styles.connBtnActive]}
+          >
+            {renderSignalIcon()}
+            <Text style={[styles.connBtnText, isConnected && styles.connBtnTextActive]}>
+              {isConnected ? 'CONNECTED' : 'DISCONNECTED'}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={handleExit} style={styles.exitBtn}>
+            <Text style={styles.exitBtnText}>EXIT</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      {/* Top Tab Switcher */}
+      <View style={styles.tabBar}>
         <TouchableOpacity 
-          onPress={isConnected ? disconnect : scanAndConnect}
-          style={[styles.connBtn, isConnected && styles.connBtnActive]}
+          onPress={() => setActiveTab('dashboard')}
+          style={[styles.tabItem, activeTab === 'dashboard' && styles.tabItemActive]}
         >
-          {isConnected ? (
-            <Bluetooth size={20} color="#fff" />
-          ) : (
-            <BluetoothOff size={20} color="#94a3b8" />
-          )}
-          <Text style={[styles.connBtnText, isConnected && styles.connBtnTextActive]}>
-            {isConnected ? 'Connected' : 'Connect'}
-          </Text>
+          <Text style={[styles.tabText, activeTab === 'dashboard' && styles.tabTextActive]}>DASHBOARD</Text>
+        </TouchableOpacity>
+        <TouchableOpacity 
+          onPress={() => setActiveTab('racebox')}
+          style={[styles.tabItem, activeTab === 'racebox' && styles.tabItemActive]}
+        >
+          <Text style={[styles.tabText, activeTab === 'racebox' && styles.tabTextActive]}>RACE BOX</Text>
         </TouchableOpacity>
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
         {renderScreen()}
       </ScrollView>
-
-      {/* Bottom Navigation */}
-      <View style={styles.navBar}>
-        <TouchableOpacity 
-          onPress={() => setActiveTab('dashboard')}
-          style={[styles.navItem, activeTab === 'dashboard' && styles.navItemActive]}
-        >
-          <Gauge size={24} color={activeTab === 'dashboard' ? '#22c55e' : '#94a3b8'} />
-          <Text style={[styles.navText, activeTab === 'dashboard' && styles.navTextActive]}>QS Dash</Text>
-        </TouchableOpacity>
-        <TouchableOpacity 
-          onPress={() => setActiveTab('settings')}
-          style={[styles.navItem, activeTab === 'settings' && styles.navItemActive]}
-        >
-          <Settings size={24} color={activeTab === 'settings' ? '#22c55e' : '#94a3b8'} />
-          <Text style={[styles.navText, activeTab === 'settings' && styles.navTextActive]}>Tuning</Text>
-        </TouchableOpacity>
-        <TouchableOpacity 
-          onPress={() => setActiveTab('racebox')}
-          style={[styles.navItem, activeTab === 'racebox' && styles.navItemActive]}
-        >
-          <Timer size={24} color={activeTab === 'racebox' ? '#22c55e' : '#94a3b8'} />
-          <Text style={[styles.navText, activeTab === 'racebox' && styles.navTextActive]}>Racebox</Text>
-        </TouchableOpacity>
-        <TouchableOpacity 
-          onPress={() => setActiveTab('profile')}
-          style={[styles.navItem, activeTab === 'profile' && styles.navItemActive]}
-        >
-          <User size={24} color={activeTab === 'profile' ? '#22c55e' : '#94a3b8'} />
-          <Text style={[styles.navText, activeTab === 'profile' && styles.navTextActive]}>Profile</Text>
-        </TouchableOpacity>
-      </View>
+      <Toast />
     </SafeAreaView>
   );
 }
@@ -317,7 +372,7 @@ export default function App() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0f172a',
+    backgroundColor: '#000',
   },
   header: {
     flexDirection: 'row',
@@ -325,72 +380,87 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 20,
     paddingVertical: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: '#1e293b',
   },
-  welcomeText: {
+  headerActions: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  logoContainer: {
+    gap: 2,
+  },
+  logoText: {
     color: '#94a3b8',
     fontSize: 12,
+    fontWeight: 'bold',
   },
-  userName: {
+  logoSubText: {
     color: '#fff',
     fontSize: 18,
     fontWeight: 'bold',
   },
+  proText: {
+    color: '#22c55e',
+  },
   connBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#1e293b',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 20,
     gap: 6,
+    backgroundColor: '#1a0a0a',
+    paddingHorizontal: 15,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#7f1d1d',
   },
   connBtnActive: {
-    backgroundColor: '#22c55e20',
-    borderWidth: 1,
     borderColor: '#22c55e',
   },
   connBtnText: {
-    color: '#94a3b8',
+    color: '#ef4444',
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: 'bold',
   },
   connBtnTextActive: {
     color: '#22c55e',
   },
+  exitBtn: {
+    backgroundColor: '#1a0a0a',
+    paddingHorizontal: 15,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#7f1d1d',
+  },
+  exitBtnText: {
+    color: '#ef4444',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  tabBar: {
+    flexDirection: 'row',
+    paddingHorizontal: 20,
+    marginBottom: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#222',
+  },
+  tabItem: {
+    flex: 1,
+    paddingVertical: 15,
+    alignItems: 'center',
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent',
+  },
+  tabItemActive: {
+    borderBottomColor: '#22c55e',
+  },
+  tabText: {
+    color: '#94a3b8',
+    fontWeight: 'bold',
+  },
+  tabTextActive: {
+    color: '#22c55e',
+  },
   scrollContent: {
     padding: 20,
-    paddingBottom: 100,
-  },
-  navBar: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: 80,
-    backgroundColor: '#1e293b',
-    flexDirection: 'row',
-    borderTopWidth: 1,
-    borderTopColor: '#334155',
-    paddingBottom: 20,
-  },
-  navItem: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 4,
-  },
-  navItemActive: {
-    borderTopWidth: 2,
-    borderTopColor: '#22c55e',
-  },
-  navText: {
-    color: '#94a3b8',
-    fontSize: 10,
-    fontWeight: '600',
-  },
-  navTextActive: {
-    color: '#22c55e',
   },
 });
