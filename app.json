@@ -6,13 +6,7 @@
     "version": "1.0.0",
     "runtimeVersion": "1.0.0",
     "orientation": "portrait",
-    "icon": "./node_modules/expo/build/templates/expo-template-blank/assets/icon.png",
     "userInterfaceStyle": "dark",
-    "splash": {
-      "image": "./node_modules/expo/build/templates/expo-template-blank/assets/splash.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#0A0A0A"
-    },
     "updates": {
       "url": "https://u.expo.dev/e8f086e3-db68-4a64-91d1-0c42a801e3a3"
     },
@@ -24,10 +18,6 @@
       "bundleIdentifier": "com.antasena.pro"
     },
     "android": {
-      "adaptiveIcon": {
-        "foregroundImage": "./node_modules/expo/build/templates/expo-template-blank/assets/adaptive-icon.png",
-        "backgroundColor": "#0A0A0A"
-      },
       "package": "com.antasena.pro"
     },
     "extra": {
